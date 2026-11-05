@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dungeonlock Wiki</title>
+<meta name="description" content="Classes, enemies, patrons and boons, biomes, upgrades and controls for Dungeonlock.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,700;1,400&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  /* The wiki is a ledger page: parchment (Sand Dune) laid on the dungeon dark (Onyx). Colours keep the doc's jobs:
+     crimson only for danger, Bitter Chocolate for locks and rules, Pale Oak for quiet text. */
+  :root { --sand: #E7D6BC; --oak: #D4C5AC; --crimson: #9B1C1C; --choc: #6E2323; --onyx: #131515; --ink: #2a2220; }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0; background: var(--onyx); color: var(--ink);
+    font: 1.125rem/1.7 'Alegreya', Georgia, serif;
+    background-image: radial-gradient(ellipse at 50% 0%, rgba(255, 154, 80, 0.12), transparent 60%);
+  }
+  a { color: var(--choc); text-underline-offset: 0.2em; }
+  a:focus-visible, .play a:focus-visible { outline: 3px solid var(--crimson); outline-offset: 3px; }
+  h1, h2, h3, nav, .play a { font-family: 'Press Start 2P', monospace; font-weight: normal; }
+
+  header { max-width: 72rem; margin: 0 auto; padding: 4rem 1.5rem 2.5rem; color: var(--sand); }
+  header h1 { margin: 0; font-size: clamp(1.8rem, 6vw, 3.4rem); text-shadow: 0.25rem 0.25rem 0 var(--choc); }
+  header p { margin: 1rem 0 2rem; font-style: italic; font-size: 1.3rem; color: var(--oak); }
+  .play { display: flex; flex-wrap: wrap; gap: 1rem; }
+  .play a {
+    display: inline-block; padding: 0.9rem 1.2rem; font-size: 0.75rem; line-height: 1.4;
+    background: var(--sand); color: var(--onyx); text-decoration: none; box-shadow: 0.25rem 0.25rem 0 var(--choc);
+  }
+  .play a:hover { transform: translate(-2px, -2px); box-shadow: 0.4rem 0.4rem 0 var(--choc); }
+  .play a.quiet { background: transparent; color: var(--sand); box-shadow: inset 0 0 0 2px var(--oak); }
+
+  .book { max-width: 72rem; margin: 0 auto 4rem; padding: 0 1.5rem; display: grid; grid-template-columns: 13rem 1fr; gap: 2.5rem; align-items: start; }
+  nav { position: sticky; top: 1.5rem; display: flex; flex-direction: column; gap: 0.9rem; font-size: 0.65rem; }
+  nav a { color: var(--oak); text-decoration: none; }
+  nav a:hover { color: var(--sand); }
+  main {
+    background: var(--sand); padding: 2.5rem clamp(1.25rem, 4vw, 3.5rem);
+    box-shadow: 0 0 0 2px var(--choc), 0 1.5rem 4rem rgba(0, 0, 0, 0.6);
+  }
+  section + section { margin-top: 3rem; padding-top: 2.5rem; border-top: 2px solid var(--choc); }
+  h2 { margin: 0 0 1.5rem; font-size: 1.05rem; color: var(--choc); }
+  .entries { display: grid; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); gap: 1.75rem 2.5rem; }
+  .entry { border-left: 4px solid var(--c, var(--oak)); padding-left: 1rem; max-width: 40rem; }
+  .entry h3 { margin: 0 0 0.6rem; font-size: 0.75rem; line-height: 1.6; color: var(--onyx); }
+  .entry p { margin: 0 0 0.6rem; }
+  .entry .stat { font-style: italic; color: #5c4a44; }
+  .entry ul { margin: 0.4rem 0 0; padding-left: 1.1rem; }
+  .entry li { margin-bottom: 0.35rem; }
+  .entry dl { margin: 0.6rem 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 0.9rem; }
+  .entry dt { font-weight: 700; }
+  .entry dd { margin: 0; }
+  .entry::after { content: ""; display: block; clear: both; }
+  .entry img { display: block; image-rendering: pixelated; background: var(--onyx); }
+  .entry img.portrait { float: right; width: 7.5rem; margin: 0 0 0.6rem 1rem; box-shadow: 0 0 0 2px var(--choc); }
+  .entry img.wide { width: 100%; height: auto; margin-bottom: 0.8rem; box-shadow: 0 0 0 2px var(--choc); }
+  footer { max-width: 72rem; margin: 0 auto; padding: 0 1.5rem 3rem; color: var(--oak); font-size: 0.95rem; }
+
+  @media (max-width: 52rem) {
+    .book { grid-template-columns: 1fr; gap: 1.25rem; }
+    nav { position: static; flex-direction: row; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>DUNGEONLOCK</h1>
+  <p>Not everything unlocks. The field guide to every class, foe, patron and room.</p>
+  <div class="play">
+    <a href="https://dungeonlock.pages.dev">Play the game</a>
+    <a class="quiet" href="https://play.dungeonlock.workers.dev">Mirror</a>
+  </div>
+</header>
+
+<div class="book">
+  <nav aria-label="Sections">
+    <a href="#classes">Classes</a>
+    <a href="#enemies">Enemies</a>
+    <a href="#patrons">Patrons</a>
+    <a href="#biomes">Biomes</a>
+    <a href="#upgrades">Upgrades</a>
+    <a href="#controls">Controls</a>
+  </nav>
+  <main>
+<section id="classes"><h2>Classes</h2><div class="entries"><article class="entry"><img class="portrait" src="img/class-knight.png" alt="" loading="lazy"><h3>Knight</h3>
+    <p>Slow and armored. Wide sword arcs, and a shield charge that stuns.</p>
+    <p class="stat">Health 120, speed 4.4. Takes 20% less damage.</p>
+    <dl>
+      <dt>Attack</dt><dd>Cleave. Wide sword arcs; every third is a heavy sweep.</dd>
+      <dt>Special</dt><dd>Shield Charge. Charge forward and stun what you hit.</dd>
+      <dt>Cast</dt><dd>Lock Shard. Throw a shard that sticks in a foe. Pick it back up.</dd>
+      <dt>Dash</dt><dd>Roll.</dd>
+    </dl></article><article class="entry"><img class="portrait" src="img/class-rogue.png" alt="" loading="lazy"><h3>Rogue</h3>
+    <p>Fast and fragile. Quick stabs that crit from behind, and two dashes.</p>
+    <p class="stat">Health 70, speed 6.4. Two dash charges.</p>
+    <dl>
+      <dt>Attack</dt><dd>Stab. Fast jabs, double damage from behind.</dd>
+      <dt>Special</dt><dd>Knife Fan. Throw three knives in a spread.</dd>
+      <dt>Cast</dt><dd>Lock Shard. Throw a shard that sticks in a foe. Pick it back up.</dd>
+      <dt>Dash</dt><dd>Shadowstep, 2 charges.</dd>
+    </dl></article><article class="entry"><img class="portrait" src="img/class-wizard.png" alt="" loading="lazy"><h3>Wizard</h3>
+    <p>Fights from range. Arcane bolts, a freezing nova, and a blink.</p>
+    <p class="stat">Health 80, speed 5.2. Blink teleports through danger.</p>
+    <dl>
+      <dt>Attack</dt><dd>Arcane Bolt. Magic bolts; every third pierces.</dd>
+      <dt>Special</dt><dd>Frost Nova. Burst around you that freezes enemies.</dd>
+      <dt>Cast</dt><dd>Lock Shard. Throw a shard that sticks in a foe. Pick it back up.</dd>
+      <dt>Dash</dt><dd>Blink.</dd>
+    </dl></article></div></section>
+<section id="enemies"><h2>Enemies</h2><div class="entries"><article class="entry"><img class="portrait" src="img/enemy-zombie.png" alt="" loading="lazy"><h3>Zombie</h3><p>Claws its way out of the earth at night in the Wilds and shambles toward you. The sun burns it at dawn.</p><p class="stat">Base health 40, rising with depth. Elites are bigger, armored and tinted crimson.</p></article><article class="entry"><img class="portrait" src="img/enemy-crawler.png" alt="" loading="lazy"><h3>Crawler</h3><p>Half a body dragging itself fast through the grass. Shows a short red line, then leaps along it.</p><p class="stat">Base health 22, rising with depth. Elites are bigger, armored and tinted crimson.</p></article><article class="entry"><img class="portrait" src="img/enemy-bloater.png" alt="" loading="lazy"><h3>Bloater</h3><p>Fat, slow and tough. Slams the ground around itself after a long windup, so hit it from range.</p><p class="stat">Base health 90, rising with depth. Elites are bigger, armored and tinted crimson.</p></article><article class="entry"><img class="portrait" src="img/enemy-bandit.png" alt="" loading="lazy"><h3>Bandit</h3><p>A road thief with a knife. Quick, but goes down in two or three cuts.</p><p class="stat">Base health 34, rising with depth. Elites are bigger, armored and tinted crimson.</p></article><article class="entry"><img class="portrait" src="img/enemy-crossbowman.png" alt="" loading="lazy"><h3>Crossbowman</h3><p>Keeps back and shoots down a red line. Close the distance or step out of the line.</p><p class="stat">Base health 26, rising with depth. Elites are bigger, armored and tinted crimson.</p></article><article class="entry"><img class="portrait" src="img/enemy-guard.png" alt="" loading="lazy"><h3>Castle Guard</h3><p>Holds a tall shield to the front and turns slowly. Step round it and strike its back.</p><p class="stat">Base health 46, rising with depth. Elites are bigger, armored and tinted crimson.</p></article><article class="entry"><img class="portrait" src="img/enemy-soldier.png" alt="" loading="lazy"><h3>Soldier</h3><p>The usurper's man-at-arms. Wide, heavy chops; wait for the swing, then answer it.</p><p class="stat">Base health 44, rising with depth. Elites are bigger, armored and tinted crimson.</p></article><article class="entry"><img class="portrait" src="img/enemy-captain.png" alt="" loading="lazy"><h3>Captain</h3><p>Leads the guard. A long windup, then a cut all the way round him. Step back and come in after.</p><p class="stat">Base health 110, rising with depth. Elites are bigger, armored and tinted crimson.</p></article><article class="entry" style="--c:var(--crimson)"><img class="portrait" src="img/enemy-blackknight.png" alt="" loading="lazy"><h3>The Black Knight, Champion of the Usurper</h3><p>Waits at the top of the tower. Wide sweeps, an overhead smash, and a running thrust.</p><p class="stat">Boss. Base health 300, rising with depth.</p></article><article class="entry"><img class="portrait" src="img/enemy-grunt.png" alt="" loading="lazy"><h3>Grunt</h3><p>Walks up and swings its sword in a wide arc. Slow to recover.</p><p class="stat">Base health 34, rising with depth. Elites are bigger, armored and tinted crimson.</p></article><article class="entry"><img class="portrait" src="img/enemy-hexer.png" alt="" loading="lazy"><h3>Hexer</h3><p>Keeps its distance and fires aimed bolts down a red line. Close in fast.</p><p class="stat">Base health 24, rising with depth. Elites are bigger, armored and tinted crimson.</p></article><article class="entry"><img class="portrait" src="img/enemy-stalker.png" alt="" loading="lazy"><h3>Stalker</h3><p>Fast. Shows a short red line, then lunges along it. Step aside.</p><p class="stat">Base health 28, rising with depth. Elites are bigger, armored and tinted crimson.</p></article><article class="entry"><img class="portrait" src="img/enemy-brute.png" alt="" loading="lazy"><h3>Brute</h3><p>Armored and heavy. Slams the ground around itself after a long windup.</p><p class="stat">Base health 90, rising with depth. Elites are bigger, armored and tinted crimson.</p></article><article class="entry"><img class="portrait" src="img/enemy-sapper.png" alt="" loading="lazy"><h3>Sapper</h3><p>Small, fast and carrying a bomb. It runs up and lights the fuse: get out of the circle, or stun it to put the fuse out.</p><p class="stat">Base health 18, rising with depth. Elites are bigger, armored and tinted crimson.</p></article><article class="entry"><img class="portrait" src="img/enemy-whirler.png" alt="" loading="lazy"><h3>Whirler</h3><p>Spins toward you with both blades out, then stands dizzy. Back off while it spins, and hit it while it reels.</p><p class="stat">Base health 60, rising with depth. Elites are bigger, armored and tinted crimson.</p></article><article class="entry"><img class="portrait" src="img/enemy-slinger.png" alt="" loading="lazy"><h3>Slinger</h3><p>Lobs bone bombs at where you stand. The red circle is where it lands, so keep moving.</p><p class="stat">Base health 26, rising with depth. Elites are bigger, armored and tinted crimson.</p></article><article class="entry"><img class="portrait" src="img/enemy-shieldbearer.png" alt="" loading="lazy"><h3>Shieldbearer</h3><p>Blocks almost everything from the front and turns slowly. Dash past it and hit its back.</p><p class="stat">Base health 50, rising with depth. Elites are bigger, armored and tinted crimson.</p></article><article class="entry"><img class="portrait" src="img/enemy-bonecaller.png" alt="" loading="lazy"><h3>Bonecaller</h3><p>Hangs back and raises grunts from the floor. Kill it first.</p><p class="stat">Base health 30, rising with depth. Elites are bigger, armored and tinted crimson.</p></article><article class="entry" style="--c:var(--crimson)"><img class="portrait" src="img/enemy-warden.png" alt="" loading="lazy"><h3>The Warden, Keeper of the Lock</h3><p>Slams, volleys and charges, and calls skeletons when hurt.</p><p class="stat">Boss. Base health 420, rising with depth.</p></article><article class="entry" style="--c:var(--crimson)"><img class="portrait" src="img/enemy-prior.png" alt="" loading="lazy"><h3>The Hollow Prior, Speaker for the Dead</h3><p>Fires rings of bolts, rains fire on where you stand, and blinks away when you close in. Calls hexers when hurt.</p><p class="stat">Boss. Base health 360, rising with depth.</p></article><article class="entry" style="--c:var(--crimson)"><img class="portrait" src="img/enemy-reaver.png" alt="" loading="lazy"><h3>The Reaver, Blade of the Deep</h3><p>Lunges three or four times in a row, then throws a fan of knives. Calls stalkers when hurt.</p><p class="stat">Boss. Base health 380, rising with depth.</p></article></div></section>
+<section id="patrons"><h2>Patrons</h2><div class="entries"><article class="entry" style="--c:#E07A3A"><h3>Cinder, the Burning Warden</h3><p>Inflicts Burn. Numbers shown are for a Common boon at level 1.</p><ul><li><b>Searing Strike</b> (attack): Your Attack inflicts 3 Burn.</li><li><b>Blazing Flourish</b> (special): Your Special deals +25% damage and inflicts 6 Burn.</li><li><b>Flare Shard</b> (cast): Your Cast bursts on impact for 18 damage and inflicts 6 Burn.</li><li><b>Ember Step</b> (dash): Your Dash leaves a burst that deals 10 damage and inflicts 3 Burn.</li><li><b>Kindling</b>: Burn deals +25% damage.</li><li><b>Heat Within</b>: Deal +15% damage to burning foes.</li><li><b>Wildfire</b> (legendary): Burning foes spread their Burn to everything near them when they die.</li></ul></article><article class="entry" style="--c:#9FC0D6"><h3>Rime, the Frozen Gaoler</h3><p>Inflicts Chill. Numbers shown are for a Common boon at level 1.</p><ul><li><b>Frostbite Strike</b> (attack): Your Attack inflicts 12% Chill.</li><li><b>Glacial Flourish</b> (special): Your Special deals +25% damage and inflicts 24% Chill.</li><li><b>Rime Shard</b> (cast): Your Cast bursts on impact for 18 damage and inflicts 24% Chill.</li><li><b>Frost Step</b> (dash): Your Dash leaves a burst that deals 10 damage and inflicts 12% Chill.</li><li><b>Brittle</b>: Frozen foes take +30% damage.</li><li><b>Cold Blood</b>: Take 20% less damage from chilled foes.</li><li><b>Shatter</b> (legendary): When a foe freezes, it shatters the ice around it for 40 damage.</li></ul></article><article class="entry" style="--c:#7FA37A"><h3>Verdigris, the Rusted Keeper</h3><p>Inflicts Corrode. Numbers shown are for a Common boon at level 1.</p><ul><li><b>Rusted Strike</b> (attack): Your Attack inflicts 6% Corrode.</li><li><b>Corroding Flourish</b> (special): Your Special deals +25% damage and inflicts 12% Corrode.</li><li><b>Acid Shard</b> (cast): Your Cast bursts on impact for 18 damage and inflicts 12% Corrode.</li><li><b>Rust Step</b> (dash): Your Dash leaves a burst that deals 10 damage and inflicts 6% Corrode.</li><li><b>Old Iron</b>: +20 max health, and heal that much now.</li><li><b>Green Coin</b>: Gain +2 Ash from every kill.</li><li><b>Ruin</b> (legendary): Corrode can stack twice as high.</li></ul></article><article class="entry" style="--c:#B49AD0"><h3>Hush, the Silent Turnkey</h3><p>Inflicts Hex. Numbers shown are for a Common boon at level 1.</p><ul><li><b>Hushed Strike</b> (attack): Your Attack inflicts 25 Hex.</li><li><b>Silent Flourish</b> (special): Your Special deals +25% damage and inflicts 50 Hex.</li><li><b>Grave Shard</b> (cast): Your Cast bursts on impact for 18 damage and inflicts 50 Hex.</li><li><b>Shade Step</b> (dash): Your Dash leaves a burst that deals 10 damage and inflicts 25 Hex.</li><li><b>Last Rites</b>: Heal 3 whenever a hexed foe dies.</li><li><b>Echo</b>: Hex blasts are 30% bigger and stronger.</li><li><b>Requiem</b> (legendary): Hex blasts hex every foe they hit.</li></ul></article><article class="entry"><h3>Duo boons</h3><p>Offered once you carry boons from both patrons.</p><ul><li><b>Steam Vent</b> (Cinder and Rime): Foes that are both burning and chilled take +50% damage.</li><li><b>Molten Rust</b> (Cinder and Verdigris): Each Burn tick also adds 2% Corrode.</li><li><b>Pyre Rite</b> (Cinder and Hush): Hex blasts inflict 6 Burn.</li><li><b>Cold Iron</b> (Rime and Verdigris): Chilled foes deal 30% less damage.</li><li><b>Still Grave</b> (Rime and Hush): Hexing a foe also inflicts 25% Chill.</li><li><b>Rot Toll</b> (Verdigris and Hush): Hex blasts deal +40% damage to corroded foes.</li></ul></article><article class="entry"><h3>Rarity and Keystones</h3><p>Common, Rare and Epic boons are worth 1, 1.5 and 2 times their base. A Keystone raises one boon by a level; each level adds 40% of its starting value. A new boon for a move replaces the old one in that slot.</p></article></div></section>
+<section id="biomes"><h2>Biomes</h2><div class="entries"><article class="entry"><img class="wide" src="img/biome-cells.png" alt="" loading="lazy"><h3>The Cells</h3><p>Depths 1 and 2 of every ten. Warm stone and orange torchlight.</p></article><article class="entry"><img class="wide" src="img/biome-crypt.png" alt="" loading="lazy"><h3>The Crypt</h3><p>Depths 3 to 5. Cold blue fire and great stone slabs.</p></article><article class="entry"><img class="wide" src="img/biome-rot.png" alt="" loading="lazy"><h3>The Rot</h3><p>Depths 6 to 8. Green light, broken floors and rubble everywhere.</p></article><article class="entry"><img class="wide" src="img/biome-halls.png" alt="" loading="lazy"><h3>The Warden's Halls</h3><p>A boss waits at depth 9: the Warden, the Hollow Prior or the Reaver, chosen at random. The Lock comes after: pay one key to escape, or take a door and go deeper. The cycle repeats every ten depths, and each lap is harder.</p></article><article class="entry"><img class="wide" src="img/biome-adventure.png" alt="" loading="lazy"><h3>The Swordsmith</h3><p>Adventure mode: a story in six chapters, from your village down the King's Road, through the castle wall, courtyard and great hall, to the Black Knight at the top of the tower. No magic: Attack is one swing that lands a moment after you start it, and Dash is one step back. Coin and iron from the men you beat buy a better blade and mail at your forge between chapters. Every chapter start is saved; falling sends you back to it.</p></article><article class="entry"><img class="wide" src="img/biome-wilds.png" alt="" loading="lazy"><h3>The Wilds</h3><p>The Open World mode: a huge island of meadow, forest, rock and lakes. Press Use by trees, rocks and bushes for wood, stone and fiber, and Tab, C or the View button to craft campfires, barricades, bandages and whetstones. Zombies rise every night and burn at dawn, and each dawn brings a boon.</p></article></div></section>
+<section id="upgrades"><h2>Upgrades</h2><div class="entries"><article class="entry"><h3>The Anvil</h3><p>Spend ash between runs. These last forever.</p><ul><li><b>Vitality</b>: +10 max health (up to 5)</li><li><b>Whetstone</b>: +8% damage (up to 5)</li><li><b>Last Breath</b>: Survive a killing blow once per run, per level (up to 2)</li><li><b>Shard Pouch</b>: +1 Cast shard (up to 2)</li><li><b>Quickstep</b>: Dash recharges 8% faster (up to 3)</li><li><b>Patron's Favor</b>: Better odds of Rare and Epic boons (up to 3)</li><li><b>Insight</b>: Reroll a boon offer once per run, per level (up to 2)</li><li><b>Greed</b>: +15% Ash carried out of every run (up to 3)</li><li><b>Spare Key</b>: Start each run holding a key (up to 1)</li></ul></article><article class="entry"><h3>Level-up perks</h3><p>Kills give XP. Each level lets you pick one of three perks once the room is clear.</p><ul><li><b>Vigor</b>: +15 max health, and heal 15</li><li><b>Might</b>: +10% damage with everything</li><li><b>Haste</b>: +8% move speed</li><li><b>Flurry</b>: Attack 10% faster</li><li><b>Focus</b>: Special recovers 15% faster</li><li><b>Deep Pockets</b>: +1 Cast shard</li><li><b>Fleet</b>: Dash recharges 15% faster</li><li><b>Leech</b>: Heal 2 per kill</li><li><b>Thorns</b>: Attackers take 6 damage</li></ul></article></div></section>
+<section id="controls"><h2>Controls</h2><div class="entries"><article class="entry"><h3>Moves</h3><p>These are the defaults. Change any of them in Settings.</p><dl><dt>Attack</dt><dd>LMB or J, or X on a controller</dd><dt>Special</dt><dd>RMB or K, or Y on a controller</dd><dt>Cast</dt><dd>Q or L, or B on a controller</dd><dt>Dash</dt><dd>SPACE or SHIFT, or A on a controller</dd><dt>Interact</dt><dd>E, or RB on a controller</dd><dt>Pause</dt><dd>ESC, or START on a controller</dd></dl></article><article class="entry"><h3>Moving and menus</h3><p>Move with WASD, the arrow keys or the left stick. Aim with the mouse or the right stick. In menus, Enter or A selects, Esc or B goes back, and Tab or Y opens extras.</p></article></div></section>
+  </main>
+</div>
+
+<footer>
+  <p>Characters and dungeon pieces are the KayKit packs by Kay Lousberg, released under CC0.</p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,4 @@
+node_modules/
+dist/
+# design doc stays private (repo is public)
+Dungeonlock Game.pdf

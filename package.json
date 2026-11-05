@@ -1,0 +1,8 @@
+{
+  "name": "dungeonlock",
+  "private": true,
+  "scripts": {
+    "start": "node serve.js",
+    "build": "node build.js"
+  }
+}
