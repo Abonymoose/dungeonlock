@@ -19,6 +19,7 @@ import { exportSave, importSave } from './save.js';
 import { makeWild, buildWild, wildUpdate, RECIPES, canCraft, craft, costText } from './wild.js';
 import { CHAPTERS, ENDING, FORGE, chapterPlan, adventureUpdate, canForge, forgeCost, forge, applyForge, newAdventure } from './adventure.js';
 import { makePrincess } from './models.js';
+import { updateTouch } from './touch.js';
 
 const CLASS_IDS = Object.keys(CLASSES);
 let hadPad = false;
@@ -270,7 +271,7 @@ function roomLogic(dt) {
     }
   }
   let wildPrompt = null;
-  if (world.adventure) run.label = `CHAPTER ${world.adventure.chapter + 1}<br>${run.ash} COIN &nbsp;${world.adventure.iron} IRON`;
+  if (world.adventure) run.label = `CHAPTER ${world.adventure.chapter + 1}<br>${world.adventure.iron} IRON`;
   if (room.plan.kind === 'field') {
     const f = adventureUpdate(room);
     if (f.exit) return finishChapter();
@@ -410,8 +411,10 @@ function settingRows() {
     { name: 'Controller rumble', key: 'rumble', kind: 'toggle' },
     { name: 'Damage numbers', key: 'numbers', kind: 'toggle' },
     { name: 'Fullscreen', kind: 'fullscreen' },
-    ...ACTIONS.map((a, i) => ({ group: i ? null : 'Controls', name: ACTION_NAME[a], action: a, kind: 'bind', note: i ? '' : 'Select a move, then press the new key, mouse button or controller button.' })),
-    { name: 'Reset controls', kind: 'reset' },
+    ...(input.touch ? [] : [
+      ...ACTIONS.map((a, i) => ({ group: i ? null : 'Controls', name: ACTION_NAME[a], action: a, kind: 'bind', note: i ? '' : 'Select a move, then press the new key, mouse button or controller button.' })),
+      { name: 'Reset controls', kind: 'reset' },
+    ]),
     { group: 'Save', name: 'Export save file', kind: 'export', note: 'Download your progress, upgrades and settings as a file.' },
     { name: 'Import save file', kind: 'import', note: 'Load a save file. It replaces what is here.' },
   ].map((r) => ({ ...r, value: valueOf(r) }));
@@ -714,6 +717,7 @@ export function frame(dt) {
   if (!(world.state === 'play' && world.hitstop > 0)) pollInput();
   STATES[world.state](dt);
   menu.click = false;
+  updateTouch(world);
   // menu backdrops: keep the heroes breathing
   if (['home', 'playmenu', 'title', 'anvil', 'settings', 'codex'].includes(world.state)) {
     world.player?.model.anim.loop('idle');

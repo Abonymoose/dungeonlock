@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#131515">
 <title>Dungeonlock</title>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
@@ -12,7 +15,9 @@
   html, body {
     margin: 0; height: 100%; overflow: hidden; background: var(--onyx); color: var(--sand);
     font-family: 'Press Start 2P', monospace; font-size: calc(var(--u) * 4); line-height: 1.7; user-select: none;
+    touch-action: none; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; -webkit-user-select: none;
   }
+  .codex, .settings { touch-action: pan-y; }
   canvas { display: block; image-rendering: pixelated; }
   body::after {
     content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 1;
@@ -227,6 +232,69 @@
   #tutorial p { margin: 0.6em 0 0.8em; font-size: 0.8em; line-height: 1.8; }
   #tutorial .bar { height: calc(var(--u) * 2); background: var(--onyx); box-shadow: 0 0 0 var(--u) var(--choc); }
   #tutorial .bar i { display: block; height: 100%; background: var(--sand); transition: width 0.2s; }
+  /* ---- phones ---- */
+  /* touch controls: a stick that appears under your left thumb, and diamond buttons like the HUD's pips */
+  #touch { position: fixed; inset: 0; z-index: 3; pointer-events: none; font-size: 9px; }
+  #touch .zone { position: absolute; left: 0; top: 0; bottom: 0; width: 48%; pointer-events: auto; }
+  #touch .stick {
+    position: absolute; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%;
+    background: rgba(19, 21, 21, 0.45); box-shadow: 0 0 0 2px var(--choc), 0 0 0 4px rgba(19, 21, 21, 0.6);
+  }
+  #touch .stick i { position: absolute; left: 32px; top: 32px; width: 48px; height: 48px; border-radius: 50%; background: var(--sand); opacity: 0.85; }
+  /* --x/--y place a button's centre from the bottom-right corner, --s is its size */
+  #touch .tb {
+    --s: 56px; position: absolute; width: var(--s); height: var(--s); right: calc(var(--x) - var(--s) / 2); bottom: calc(var(--y) - var(--s) / 2);
+    transform: rotate(45deg); pointer-events: auto;
+    display: flex; align-items: center; justify-content: center; background: rgba(19, 21, 21, 0.7);
+    box-shadow: 0 0 0 2px var(--choc), 0 0 0 4px rgba(19, 21, 21, 0.7); color: var(--sand); opacity: 0.85;
+  }
+  #touch .tb span { transform: rotate(-45deg); text-shadow: 1px 1px 0 var(--onyx); }
+  #touch .tb.on { background: var(--choc); box-shadow: 0 0 0 2px var(--sand), 0 0 0 4px var(--onyx); opacity: 1; }
+  #touch .attack { --s: 84px; --x: 84px; --y: 84px; background: rgba(110, 35, 35, 0.75); }
+  #touch .dash { --x: 196px; --y: 66px; }
+  #touch .special { --x: 66px; --y: 196px; }
+  #touch .cast { --s: 50px; --x: 172px; --y: 172px; }
+  #touch .interact { --x: 300px; --y: 66px; display: none; }
+  #touch.use .interact { display: flex; }
+  #touch .pause, #touch .craft { right: auto; bottom: auto; left: calc(var(--x) - var(--s) / 2); top: calc(var(--y) - var(--s) / 2); }
+  #touch .pause { --s: 36px; --x: 30px; --y: 30px; }
+  #touch .craft { --s: 46px; --x: 96px; --y: 34px; display: none; }
+  #touch.wild .craft { display: flex; }
+  #touch.grounded .special, #touch.grounded .cast { display: none; }
+  /* the use prompt sits above the thumbs; hints with one button become tappable chips */
+  .touch-on #prompt { bottom: 34%; }
+  .touch-on .hints > span { padding: 0.5em 0.9em; border: var(--u) solid var(--choc); background: var(--onyx); }
+  .touch-on .hints .btn:only-of-type { display: none; }
+  .touch-on #talk { pointer-events: auto; }
+  /* held upright: ask for sideways */
+  #rotate { display: none; }
+  @media (orientation: portrait) and (pointer: coarse) {
+    #rotate {
+      position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 24px; padding: 32px; text-align: center; background: var(--onyx); color: var(--sand); font-size: 12px; line-height: 2;
+    }
+    #rotate .phone { width: 44px; height: 76px; box-shadow: 0 0 0 3px var(--sand); animation: turn 2.4s steps(1) infinite; }
+    @keyframes turn { 50% { transform: rotate(90deg); } }
+  }
+  /* short screens (phones on their side): smaller menu cards so a row of them fits */
+  @media (max-height: 520px) {
+    /* cards share one row, shrinking on narrow phones; anything still too tall scrolls */
+    .pcards, .cards { gap: calc(var(--u) * 4); flex-wrap: nowrap; width: 100%; }
+    .pcard, .card { flex: 1 1 0; min-width: 0; max-width: calc(var(--u) * 70); }
+    #screen { justify-content: safe center; overflow-y: auto; touch-action: pan-y; }
+    .pcard p, .card p { font-size: 0.7em; }
+    .pcard .art { aspect-ratio: 5 / 2; }
+    .card { min-height: 0; }
+    .card.boon { min-height: calc(var(--u) * 64); }
+    #screen { gap: calc(var(--u) * 4); padding: calc(var(--u) * 5); }
+    #screen h1 { font-size: 2.2em; }
+    #banner { top: 22%; }
+    #banner h1 { font-size: 1.6em; }
+    .home .logo { font-size: 2.6em; }
+    .home .tag { margin: 0.6em 0 1.4em; }
+    .home .record { margin-top: 1.6em; }
+  }
+  @media (prefers-reduced-motion: reduce) { #rotate .phone { animation: none; } }
   @media (prefers-reduced-motion: reduce) { .home-item, .door, #tutorial .bar i { transition: none; } .blink { animation: none; } }
 </style>
 </head>
@@ -246,9 +314,10 @@
 <div id="prompt" class="panel hidden"></div>
 <div id="banner"><h1></h1><p></p></div>
 <div id="tutorial" class="hidden"></div>
-<div id="talk" class="hidden"></div>
+<div id="talk" class="hidden" data-act="confirm"></div>
 <div id="screen" class="hidden"></div>
 <div id="fade"></div>
+<div id="rotate"><div class="phone"></div><p>Turn your phone sideways to play.</p></div>
 <script>
   if (location.protocol === 'file:') document.body.insertAdjacentHTML('beforeend',
     '<div id="nofile">Double-click start.bat to play.<br><br>The game has to run from a local server so modules and controllers work.</div>');

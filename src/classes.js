@@ -139,6 +139,17 @@ function assist(p, range) {
   if (best) p.facing.subVectors(best.pos, p.pos).setY(0).normalize();
 }
 
+// touch auto-aim: the closest living enemy within reach, if any
+let foe = null;
+function nearestFoe(p, reach = 7) {
+  let best = null, d2 = reach * reach;
+  for (const e of opponents(0)) {
+    const d = e.pos.distanceToSquared(p.pos);
+    if (d < d2 && d > 0.01) { d2 = d; best = e; }
+  }
+  return best;
+}
+
 export function updatePlayer(p, dt) {
   const cls = p.cls;
   tickEntity(p, dt);
@@ -152,7 +163,8 @@ export function updatePlayer(p, dt) {
       // keyboard and mouse: always face the cursor, twin-stick style
       const g = screenToGround(input.mouse.x, input.mouse.y).sub(p.pos).setY(0);
       if (g.lengthSq() > 0.04) p.facing.copy(g.normalize());
-    } else if (move.lengthSq() > 0.0001) p.facing.copy(move).normalize();
+    } else if (input.touch && (foe = nearestFoe(p))) p.facing.copy(foe.pos).sub(p.pos).setY(0).normalize();
+    else if (move.lengthSq() > 0.0001) p.facing.copy(move).normalize();
   }
 
   p.atkCd -= dt; p.spcCd -= dt; p.attackLock -= dt;

@@ -154,14 +154,23 @@ export async function all() {
 // Run on http://localhost:5173 after all(), then copy assets/shots/*.png to wiki/img/:
 //   const S = await import('/test/shots.js'); await S.buildWiki();
 export async function buildWiki() {
-  const { TABS, codexBody } = await import('../src/codex.js');
+  const { MODES, CONTROLS, wikiPart } = await import('../src/codex.js');
   const { resetControls } = await import('../src/settings.js');
   resetControls(); // the wiki lists the default keys, not this browser's
-  const page = await (await fetch('/wiki/index.html')).text();
-  const a = page.indexOf('<main>') + '<main>'.length, b = page.indexOf('</main>');
-  const sections = TABS.map((t, i) => `<section id="${t.toLowerCase()}"><h2>${t}</h2><div class="entries">${codexBody(i, 'img/')}</div></section>`)
-    .join('\n').replace('Change these in Settings.', 'These are the defaults. Change any of them in Settings.');
-  const res = await fetch('/__wiki', { method: 'POST', body: page.slice(0, a) + '\n' + sections + '\n  ' + page.slice(b) });
+  let page = await (await fetch('/wiki/index.html')).text();
+  const slug = (t) => t.toLowerCase().replace(/[^a-z]+/g, '-').replace(/^-|-$/g, '');
+  const entries = (part) => wikiPart(part, 'img/').replace(/<(\/?)h3>/g, '<$1h4>'); // entries sit under a part heading
+  const nav = MODES.map((m) => `<a class="mode" href="#${m.id}">${m.name}</a>` + m.parts.map(([t]) => `<a href="#${m.id}-${slug(t)}">${t}</a>`).join(''))
+    .join('') + '<a class="mode" href="#controls">Controls</a>';
+  const main = MODES.map((m) => `<section id="${m.id}" class="mode">
+    <div class="mode-head"><img src="img/${m.art}.png" alt="" width="300" height="220"><div><h2>${m.name}</h2><p>${m.intro}</p></div></div>
+    ${m.parts.map(([t, part]) => `<div class="part" id="${m.id}-${slug(t)}"><h3>${t}</h3><div class="entries">${entries(part)}</div></div>`).join('\n    ')}
+  </section>`).join('\n')
+    + `\n<aside class="appendix" id="controls"><h3>Controls</h3><div class="entries">${entries(CONTROLS).replace('Change these in Settings.', 'These are the defaults. Change any of them in Settings.')}</div></aside>`;
+  const splice = (open, close, html) => { const a = page.indexOf(open) + open.length, b = page.indexOf(close, a); page = page.slice(0, a) + '\n' + html + '\n  ' + page.slice(b); };
+  splice('<nav aria-label="Sections">', '</nav>', nav);
+  splice('<main>', '</main>', main);
+  const res = await fetch('/__wiki', { method: 'POST', body: page });
   return res.ok ? 'wiki rebuilt' : 'FAILED';
 }
 

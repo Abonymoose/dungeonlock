@@ -3,7 +3,10 @@ import { settings, ACTIONS } from './settings.js';
 
 // Keyboard keys and mouse buttons share one set; mouse buttons are stored as 'Mouse0', 'Mouse1', 'Mouse2'
 const keys = new Set();
-export const input = { move: { x: 0, y: 0 }, aim: null, pad: null, usingPad: false, mouse: null, mouseAim: false, capture: null };
+export const input = { move: { x: 0, y: 0 }, aim: null, pad: null, usingPad: false, mouse: null, mouseAim: false, capture: null, touch: false };
+// On-screen controls (touch.js) write here: stick direction, buttons held, and one-frame taps from tappable hints
+export const touch = { x: 0, y: 0, held: new Set(), taps: new Set(), last: -1e9 };
+const fromTouch = () => performance.now() - touch.last < 800; // browsers send fake mouse events after a tap
 
 // Rebinding: the next key, mouse button or pad button goes to input.capture instead of the game
 function captured(binding) {
@@ -21,8 +24,12 @@ addEventListener('keydown', (e) => {
 });
 addEventListener('keyup', (e) => keys.delete(e.code));
 addEventListener('blur', () => keys.clear());
-addEventListener('mousemove', (e) => { input.mouse = { x: e.clientX, y: e.clientY }; input.mouseAim = true; input.usingPad = false; });
+addEventListener('mousemove', (e) => {
+  if (fromTouch()) return;
+  input.mouse = { x: e.clientX, y: e.clientY }; input.mouseAim = true; input.usingPad = false; input.touch = false;
+});
 addEventListener('mousedown', (e) => {
+  if (fromTouch()) return;
   if (captured({ kind: 'key', code: 'Mouse' + e.button })) return; // rebinding takes any click, even on a menu
   if (e.target.closest?.('#screen')) return; // other clicks on menus are handled by the menus
   keys.add('Mouse' + e.button);
@@ -78,32 +85,37 @@ export function pollInput() {
   for (const name of ALL) {
     const b = binding(name);
     prev[name] = held[name];
-    let on = b.keys.some((k) => keys.has(k));
+    let on = b.keys.some((k) => keys.has(k)) || touch.held.has(name) || touch.taps.has(name);
     if (pad) {
       on ||= b.pad.some((i) => pad.buttons[i]?.pressed);
       if (b.axis) on ||= (pad.axes[b.axis[0]] ?? 0) * b.axis[1] > 0.5;
     }
     held[name] = on;
   }
+  touch.taps.clear();
 
   let [x, y] = pad ? stick(pad.axes[0] ?? 0, pad.axes[1] ?? 0) : [0, 0];
   const kx = (keys.has('KeyD') || keys.has('ArrowRight')) - (keys.has('KeyA') || keys.has('ArrowLeft'));
   const ky = (keys.has('KeyS') || keys.has('ArrowDown')) - (keys.has('KeyW') || keys.has('ArrowUp'));
   if (kx || ky) { const l = Math.hypot(kx, ky); x = kx / l; y = ky / l; }
+  if (touch.x || touch.y) { x = touch.x; y = touch.y; }
   input.move.x = x; input.move.y = y;
 
   const [ax, ay] = pad ? stick(pad.axes[2] ?? 0, pad.axes[3] ?? 0) : [0, 0];
   input.aim = ax || ay ? { x: ax, y: ay } : null;
 
   // prompts and aiming follow whichever device was touched last
-  if (keys.size) input.usingPad = false;
-  if (pad && (now.some(Boolean) || pad.axes.some((a) => Math.abs(a) > 0.5))) { input.usingPad = true; input.mouseAim = false; }
+  if (keys.size) input.usingPad = input.touch = false;
+  if (pad && (now.some(Boolean) || pad.axes.some((a) => Math.abs(a) > 0.5))) { input.usingPad = true; input.mouseAim = input.touch = false; }
 }
 
 export const pressed = (action) => !!held[action] && !prev[action];
 export const isHeld = (action) => !!held[action];
-export const label = (action) => (input.usingPad ? padName(binding(action).pad[0]) : keyName(binding(action).keys[0]));
-export const btn = (action) => `<span class="btn">${label(action)}</span>`;
+// on touch, prompts name the on-screen button
+const TOUCH = { attack: 'ATTACK', special: 'SPECIAL', cast: 'CAST', dash: 'DASH', interact: 'USE', craft: 'CRAFT', pause: 'PAUSE', confirm: 'TAP', back: 'BACK', alt: 'MORE', left: '<', right: '>', up: '^', down: 'v' };
+export const label = (action) => (input.touch ? TOUCH[action] : input.usingPad ? padName(binding(action).pad[0]) : keyName(binding(action).keys[0]));
+// data-act makes a hint tappable (touch.js turns the tap into a press)
+export const btn = (action) => `<span class="btn" data-act="${action}">${label(action)}</span>`;
 
 export function rumble(strong = 0.4, weak = 0.4, ms = 80) {
   if (!settings.rumble) return;

@@ -1,5 +1,5 @@
 import { world } from './world.js';
-import { btn } from './input.js';
+import { btn, input } from './input.js';
 import { spawnEnemy } from './enemies.js';
 import { sfx } from './audio.js';
 
@@ -8,7 +8,7 @@ const dummy = () => world.enemies.find((e) => e.type === 'dummy' && !e.dead);
 const fightOver = () => world.pendingSpawns === 0 && !world.enemies.some((e) => !e.dead && e.type !== 'dummy');
 
 export const STEPS = [
-  { text: () => 'Walk around the room with the left stick or WASD.', goal: 6, count: (t) => t.moved },
+  { text: () => (input.touch ? 'Walk around the room: drag your thumb on the left side of the screen.' : 'Walk around the room with the left stick or WASD.'), goal: 6, count: (t) => t.moved },
   { text: () => `Dash with ${btn('dash')}. You can't be hit while dashing.`, goal: 2, count: (t) => t.dashes },
   { text: () => `Hold ${btn('attack')} to attack the training dummy. Every third hit is a heavy finisher.`, goal: 3, count: (t) => t.hits.attack ?? 0 },
   { text: () => `Use your special on the dummy with ${btn('special')}.`, goal: 1, count: (t) => t.hits.special ?? 0 },

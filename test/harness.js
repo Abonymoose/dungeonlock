@@ -464,3 +464,52 @@ export async function adventure() {
   clickSel(0); // back toward Dungeon mode for the other tests
   return results;
 }
+
+// Phone controls: a touch switches prompts over; the left-side stick walks; held buttons swing; aim finds the foe;
+// a tapped hint works as its button; the buttons hide in menus
+export async function touchControls() {
+  const results = [];
+  const P = await import('./phone.js');
+  const { touch } = await import('../src/input.js');
+  await toTitle();
+  press(0);
+  await waitFor('play');
+  const p = W.player;
+  p.maxHp = p.hp = 99999;
+  for (const e of W.enemies) { e.hp = 0; e.dead = true; }
+  step(0.5);
+  P.tap(innerWidth * 0.75, innerHeight * 0.1);
+  step(1 / 60);
+  check(results, 'a touch shows the touch buttons', input.touch && !document.getElementById('touch').classList.contains('hidden'));
+  p.pos.copy(W.room.center);
+  const from = p.pos.clone(), f = P.down(innerWidth * 0.2, innerHeight * 0.6);
+  P.move(f, innerWidth * 0.2 - 60, innerHeight * 0.6);
+  step(0.4);
+  P.up(f);
+  step(1 / 60);
+  check(results, 'the stick walks', p.pos.distanceTo(from) > 1 && !touch.x, p.pos.distanceTo(from).toFixed(2));
+  const a = P.down(...P.centre('#touch .attack'));
+  let swung = 0;
+  for (let i = 0; i < 40; i++) { step(1 / 60); if (p.attackLock > 0) swung++; }
+  P.up(a);
+  step(1 / 60);
+  check(results, 'holding Attack swings', swung > 0 && !touch.held.size, `${swung} frames`);
+  spawnEnemy('grunt', p.pos.x + 3, p.pos.z, 0);
+  step(1);
+  const foe = W.enemies.find((e) => !e.dead);
+  check(results, 'aim turns to the nearest foe', foe && p.facing.dot(foe.pos.clone().sub(p.pos).setY(0).normalize()) > 0.9);
+  P.tapEl('#touch .pause');
+  step(1 / 30);
+  check(results, 'the pause button pauses, and the buttons hide', W.state === 'pause' && document.getElementById('touch').classList.contains('hidden'), W.state);
+  P.tapEl('[data-sel="1"]'); // abandon
+  for (let t = 0; t < 8000 && W.state !== 'over'; t += 100) { await sleep(100); step(0.02); }
+  press(0);
+  await waitFor('title');
+  P.tap(innerWidth / 2, 4);
+  P.tapEl('.hints > span:last-child'); // Back, as a chip
+  step(1 / 30);
+  check(results, 'a tapped hint works as its button', W.state === 'playmenu', W.state);
+  clickSel(0);
+  input.touch = false; // the other tests use the pad
+  return results;
+}

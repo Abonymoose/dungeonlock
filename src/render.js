@@ -139,9 +139,11 @@ const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
 // Render at low resolution, then scale up by a whole number for crisp, even pixels
 export function resize() {
-  const scale = Math.max(1, Math.floor(innerHeight / ROWS));
-  const w = Math.ceil(innerWidth / scale), h = Math.ceil(innerHeight / scale);
-  cssW = w * scale; cssH = h * scale;
+  // whole device pixels per art pixel: phones (pixel ratio 2-3) stay crisp and as chunky as a desktop
+  const dpr = devicePixelRatio || 1;
+  const scale = Math.max(1, Math.floor(innerHeight * dpr / ROWS));
+  const w = Math.ceil(innerWidth * dpr / scale), h = Math.ceil(innerHeight * dpr / scale);
+  cssW = w * scale / dpr; cssH = h * scale / dpr;
   renderer.setSize(w, h, false);
   renderer.domElement.style.width = cssW + 'px';
   renderer.domElement.style.height = cssH + 'px';
@@ -153,7 +155,9 @@ export function resize() {
   ppu = h / VIEW;
   Object.assign(camera, { left: -w / 2 / ppu, right: w / 2 / ppu, top: h / 2 / ppu, bottom: -h / 2 / ppu });
   camera.updateProjectionMatrix();
-  document.documentElement.style.setProperty('--u', scale + 'px');
+  // the UI unit in CSS px: whole pixels on a desktop; on a short phone screen a bit bigger so text stays readable
+  const u = innerHeight < 2 * ROWS ? innerHeight / 150 : Math.floor(innerHeight / ROWS);
+  document.documentElement.style.setProperty('--u', u + 'px');
 }
 addEventListener('resize', resize);
 resize();
