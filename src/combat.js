@@ -29,7 +29,19 @@ export const opponents = (team) => team === 0
   ? world.enemies.filter((e) => !e.dead)
   : (world.player && !world.player.dead ? [world.player] : []);
 
+function perfectDodge(p) {
+  p.dodgeCd = 0.6;
+  p.dodgeT = 1.5;
+  world.slowmo = Math.max(world.slowmo ?? 0, 0.45);
+  if (world.run) world.run.dodges = (world.run.dodges ?? 0) + 1;
+  floatText(p.pos, 'PERFECT DODGE', 'crit');
+  flashLight(p.pos, C.SAND, 6, 0.25);
+  sfx('blink');
+}
+
 export function tickEntity(e, dt) {
+  if (e.dodgeT > 0) e.dodgeT -= dt;
+  if (e.dodgeCd > 0) e.dodgeCd -= dt;
   e.stun = Math.max(0, e.stun - dt);
   e.slow = Math.max(0, e.slow - dt);
   e.invuln = Math.max(0, e.invuln - dt);
@@ -65,11 +77,17 @@ export function heal(e, amount) {
 
 // tag says which move dealt it (attack, special, cast, dash, status...) so boons can react; quiet skips the juice (burn ticks)
 export function damage(target, amount, from, { knockback = 0, stun = 0, crit = false, heavy = false, source = null, tag = null, quiet = false, color = null } = {}) {
-  if (target.dead || target.invuln > 0) return false;
+  if (target.dead) return false;
+  if (target.invuln > 0) {
+    if (target.team === 0 && source?.team === 1 && (target.sinceDash ?? 9) < 0.35 && !(target.dodgeCd > 0)) perfectDodge(target);
+    return false;
+  }
   const byPlayer = target.team === 1 && (source?.team === 0 || tag === 'status');
+  if (byPlayer && world.player?.dodgeT > 0) amount *= 1.5;
   if (byPlayer && hooks.dmgMult) amount *= hooks.dmgMult(target, tag);
   if (target.team === 0 && hooks.playerHurt) amount = hooks.playerHurt(source, amount);
   if (target.team === 0 && settings.hardcore) amount *= 1.5;
+  if (target.team === 0 && world.run?.curse?.id === 'glass') amount *= 1.3;
   if (target.team === 0 && world.run) world.run.hurt = true;
   if (target.team === 0 && source?.affix === 'vampiric' && !source.dead) heal(source, amount * 2); // it drinks what it takes
   // a shieldbearer takes a fifth of any hit that comes from in front of it

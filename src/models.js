@@ -75,6 +75,12 @@ const ZOMBIE = { idle: 'Idle', run: 'Walk', hit: 'HitReact', death: 'Death', att
 export const makeZombie = () => character(Math.random() < 0.5 ? 'Zombie_Basic' : 'Zombie_Arm', { scale: 0.9, anims: ZOMBIE });
 export const makeCrawler = () => character('Zombie_Ribcage', { scale: 0.9, anims: { ...ZOMBIE, run: 'Crawl', attack: 'Jump' } });
 export const makeBloater = () => character('Zombie_Chubby', { scale: 0.85, anims: ZOMBIE });
+// the Wilds' boss: a bloater grown huge and grave-dark
+export const makeGraveLord = () => {
+  const m = character('Zombie_Chubby', { scale: 1.6, anims: ZOMBIE });
+  for (const mat of m.mats) mat.color.multiply(new THREE.Color(0x9a8ab0));
+  return m;
+};
 export const makeSapper = () => {
   const m = skeleton('Skeleton_Minion', {
     scale: 0.44, lend: [['Rogue_Hooded', 'Throwable', 'handslotr']], anims: { ...SKEL, run: 'Running_B', attack: 'Spellcast_Raise' },

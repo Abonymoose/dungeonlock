@@ -318,3 +318,32 @@ export async function classShots(ids = ['barbarian', 'necromancer']) {
   T.step(3);
   return out;
 }
+
+// Portraits for enemies added later.  Run:  await S.portraits(['gravelord']);
+export async function portraits(types, depth = 4) {
+  const out = [];
+  await T.toTitle();
+  T.press(0);
+  await T.waitFor('play');
+  W.player.maxHp = W.player.hp = 9999;
+  const k = W.room.center;
+  for (const type of types) {
+    for (const e of W.enemies) { e.hp = 0; e.dead = true; }
+    T.step(2);
+    const at = W.room.freeSpot(k, 0);
+    W.player.pos.copy(W.room.freeSpot(at, 6));
+    spawnEnemy(type, at.x, at.z, depth);
+    T.step(2.2);
+    const e = W.enemies.find((x) => !x.dead && x.type === type);
+    if (!e) { out.push(type + ' missing'); continue; }
+    Object.assign(e, { timer: 99, state: 'recover' });
+    e.facing.set(1, 0, 1).normalize();
+    e.model.root.rotation.y = FACE_CAMERA;
+    T.step(0.3);
+    const big = e.T.boss ? 2 : 1;
+    out.push(await shot('enemy-' + type, e.pos, { zoom: 2.4 / big, w: 120, h: 132, lift: 0.6 * big }));
+  }
+  W.player.hp = 0; W.player.dead = true;
+  T.step(3);
+  return out;
+}

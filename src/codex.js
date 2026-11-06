@@ -35,7 +35,7 @@ const classEntry = (c, img) => entry(c.name, `
 const foe = (e, growth) => entry(e.boss ? `${e.name}, ${e.title}` : e.name, `<p>${e.about}</p><p class="stat">${e.boss ? 'Boss. ' : ''}Base health ${e.hp}, ${growth}</p>`, e.boss ? 'var(--crimson)' : null, 'enemy-' + e.id);
 const dungeonGrowth = (e) => `rising with depth.${e.boss ? '' : ' Elites are bigger, armored and tinted crimson.'}`;
 const foes = (ids, growth) => BESTIARY.filter((e) => ids.includes(e.id)).map((e) => foe(e, typeof growth === 'function' ? growth(e) : growth)).join('');
-const WILDS_FOES = ['zombie', 'crawler', 'bloater'], STORY_FOES = ['bandit', 'crossbowman', 'guard', 'soldier', 'captain', 'blackknight'];
+const WILDS_FOES = ['zombie', 'crawler', 'bloater', 'gravelord'], STORY_FOES = ['bandit', 'crossbowman', 'guard', 'soldier', 'captain', 'blackknight'];
 const DUNGEON_FOES = BESTIARY.map((e) => e.id).filter((id) => !WILDS_FOES.includes(id) && !STORY_FOES.includes(id));
 const ELITES = () => entry('Elites', `<p>Bigger, armoured and tinted crimson, more common the deeper you go. Each carries one affix, named over its head as it rises:</p><ul>${Object.values(AFFIXES).map((a) => `<li><b>${a.name}</b>: ${a.about}.</li>`).join('')}</ul>`, 'var(--crimson)');
 
@@ -54,6 +54,16 @@ const BIOMES = [
   ['The Wilds', 'The Open World mode: a huge island of meadow, forest, rock and lakes. Press Use by trees, rocks and bushes for wood, stone and fiber, and Tab, C or the View button to craft campfires, barricades, bandages and whetstones. Zombies rise every night and burn at dawn, and each dawn brings a boon.', 'wilds'],
 ];
 const biome = ([n, t, id]) => entry(n, `<p>${t}</p>`, null, 'biome-' + id, true);
+// what can wait behind a door
+const ROOMS = () => entry('Rooms', `<p>Each door shows what waits behind it.</p><dl>
+  <dt>Fights</dt><dd>Clear the room for the reward over the door: a patron's boon, ash, a key, healing or a Keystone.</dd>
+  <dt>Elite rooms</dt><dd>From depth 3: tougher fights, with brutes and more elites, for a better reward.</dd>
+  <dt>Fountains</dt><dd>From depth 2: drink to heal half your health. No fight.</dd>
+  <dt>Vaults</dt><dd>Locked: spend a key for a boon and healing, no fight.</dd>
+  <dt>The Peddler</dt><dd>From depth 3: a hooded trader who sells healing, keys, boons, Keystones and max health for the ash you carry this run. Each once per visit.</dd>
+  <dt>Shrines</dt><dd>From depth 4: strike one bargain. Blood Price trades max health for an Epic boon; Iron Debt and Glass Pact pay up front, then make the next three fights harder.</dd>
+  <dt>The Lock</dt><dd>Every tenth depth: pay a key to escape with your ash, or go deeper.</dd>
+</dl>`);
 
 // each class's three weapons; all but the first are bought once, with ash, on class select
 const weaponsEntry = (id) => entry(`${CLASSES[id].name}'s weapons`, `<p>Press up or down on class select to look through them.</p><dl>${WEAPONS[id].map((w) =>
@@ -74,7 +84,7 @@ const SECTIONS = [
       .map((b) => boonLine(b, 'duo', ` (${b.duo.map((d) => PATRONS[d].name).join(' and ')})`)).join('')}</ul>`)
     + entry('Rarity and Keystones', '<p>Common, Rare and Epic boons are worth 1, 1.5 and 2 times their base. A Keystone raises one boon by a level; each level adds 40% of its starting value. A new boon for a move replaces the old one in that slot.</p>'),
 
-  () => BIOMES.map(biome).join(''),
+  () => BIOMES.map(biome).join('') + ROOMS(),
 
   () => entry('The Anvil', `<p>Spend ash between runs, at the Anvil in the Keep. These last forever.</p><ul>${UPGRADES.map((u) => `<li><b>${u.name}</b>: ${u.desc} (up to ${u.max})</li>`).join('')}</ul>`)
     + entry('Level-up perks', `<p>Kills give XP. Each level lets you pick one of three perks once the room is clear.</p><ul>${PERKS.map((k) => `<li><b>${k.name}</b>: ${k.desc}</li>`).join('')}</ul>`)
@@ -84,6 +94,7 @@ const SECTIONS = [
 
   () => entry('Moves', `<p>Change these in Settings.</p><dl>${ACTIONS.map((a) => `<dt>${a[0].toUpperCase() + a.slice(1)}</dt><dd>${settings.keys[a].map(keyName).join(' or ')}, or ${padName(settings.pad[a])} on a controller</dd>`).join('')}</dl>`)
     + entry('Moving and menus', '<p>Move with WASD, the arrow keys or the left stick. Aim with the mouse or the right stick. In menus, Enter or A selects, Esc or B goes back, and Tab or Y opens extras.</p>')
+    + entry('Perfect dodge', '<p>Dash through an attack just as it lands. Time slows for a moment, and your hits deal 50% more for a second and a half.</p>')
     + entry('On a phone', '<p>Hold it sideways. Drag anywhere on the left half of the screen to move, and use the buttons on the right. You face the nearest enemy on your own. Tap menus and hints directly.</p>'),
 ];
 
@@ -98,6 +109,7 @@ export const MODES = [
       ['Classes', () => Object.entries(CLASSES).map(([id, c]) => classEntry(c, 'class-' + id)).join('')],
       ['Weapons', () => Object.keys(CLASSES).map(weaponsEntry).join('')],
       ['The Keep and the depths', () => DEPTHS.map(biome).join('')],
+      ['Rooms', ROOMS],
       ['Enemies and bosses', () => ELITES() + foes(DUNGEON_FOES, dungeonGrowth)],
       ['Patrons and boons', SECTIONS[2]],
       ['Upgrades', SECTIONS[4]],

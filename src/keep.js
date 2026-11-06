@@ -65,6 +65,9 @@ const LINES = {
     [RATTLE, 'The Necromancer raises skeletons to fight for him. Twelve seconds, then back to dust. Union rules, I think.'],
     [RATTLE, 'The Barbarian hits harder the more he bleeds. I tried that. I just fell apart. Literally. Took an hour.'],
     [RATTLE, 'Elites with names over their heads? Read the name. Volatile ones go bang. Vampiric ones drink. Rude, both.'],
+    [RATTLE, 'There is a Peddler down there. Hooded fellow. Sells keys and boons for the ash in your pockets. Never tells me his name. Rude.'],
+    [RATTLE, 'Shrines offer bargains. Never take a bargain from a glowing red ball. I did once. That is how I lost the arm.'],
+    [RATTLE, 'Dash through a blow just as it lands and the whole world slows down. Perfect dodge, they call it. I call it showing off.'],
     [RATTLE, 'Feats pay ash the moment you do them. I earned one once: Stood In A Corner For Ninety Years. Nobody gave me ash.'],
   ],
 };

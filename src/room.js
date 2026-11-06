@@ -10,7 +10,7 @@ import { occludes } from './run.js';
 import { sfx, musicFor } from './audio.js';
 
 const clamp = THREE.MathUtils.clamp;
-const ICON = { key: 'key', heal: 'heal', boon: 'boon', ash: 'ash', treasure: 'boon', boss: 'skull', exit: 'key', pom: 'pom' };
+const ICON = { key: 'key', heal: 'heal', boon: 'boon', ash: 'ash', treasure: 'boon', boss: 'skull', exit: 'key', pom: 'pom', shop: 'ash', shrine: 'skull' };
 const rand = (a) => a[Math.floor(Math.random() * a.length)];
 const key = (x, z) => `${x},${z}`;
 

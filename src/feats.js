@@ -18,6 +18,11 @@ export const FEATS = [
   { id: 'armory', name: 'Armory', desc: 'Own every weapon.', ash: 100 },
   { id: 'nights', name: 'Five Nights', desc: 'Live through five nights in the Wilds.', ash: 80 },
   { id: 'story', name: 'Happily Ever After', desc: 'Finish the Adventure.', ash: 100 },
+  { id: 'merchant', name: 'Good Custom', desc: 'Buy three wares from the Peddler in one run.', ash: 60 },
+  { id: 'dodger', name: 'Ghost Step', desc: 'Make ten perfect dodges in one run.', ash: 80 },
+  { id: 'gravelord', name: 'Lights Out', desc: 'Kill the Grave Lord in the Wilds.', ash: 120 },
+  { id: 'shrine', name: 'A Fair Price', desc: 'Strike a bargain at a Shrine.', ash: 30 },
+  { id: 'army', name: 'Army of One', desc: 'Have four raised dead fighting for you at once.', ash: 60 },
 ];
 
 export const hasFeat = (id) => !!meta.feats?.[id];

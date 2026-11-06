@@ -715,3 +715,121 @@ export async function allies() {
   step(3);
   return results;
 }
+
+// The Peddler: a shop room sells for run ash, once per ware, and keeps the doors open
+export async function shop() {
+  const results = [];
+  await toTitle();
+  press(0);
+  await waitFor('play');
+  W.player.maxHp = W.player.hp = 99999;
+  W.run.depth = 3;
+  const d = W.room.doors[0];
+  Object.assign(d, { kind: 'shop', reward: 'shop', locked: false });
+  W.room.openDoors();
+  d.open = true;
+  await goDoor(d);
+  const sh = W.room.shop;
+  check(results, 'a shop door leads to the Peddler', W.room.plan.kind === 'shop' && !!sh, W.room.plan.kind);
+  W.run.ash = 500;
+  W.player.hp = 100;
+  W.player.pos.copy(sh.pos).add(new THREE.Vector3(1, 0, 1));
+  step(0.1);
+  press(5);
+  check(results, 'Use opens his stall', W.state === 'choice', W.state);
+  step(0.5); // the stall ignores input for a moment, so a mashed button can't buy by accident
+  clickSel(0); // Healing Draught
+  step(0.1);
+  check(results, 'buying spends run ash and works', W.run.ash < 500 && W.player.hp > 100 && sh.sold.has('draught'), `${W.run.ash} ash, ${Math.round(W.player.hp)} hp`);
+  press(5);
+  step(0.5);
+  const ash = W.run.ash;
+  clickSel(0); // sold already
+  step(0.1);
+  check(results, 'each ware sells once', W.run.ash === ash, `${W.run.ash}`);
+  press(1);
+  step(0.1);
+  check(results, 'the doors stay open', W.room.doors.every((x) => x.open) && W.state === 'play');
+  W.player.hp = 0; W.player.dead = true;
+  step(3);
+  return results;
+}
+
+// Perfect dodge: a blow that lands mid-dash slows the world and sharpens your next hits
+export async function dodge() {
+  const results = [];
+  await toTitle();
+  press(0);
+  await waitFor('play');
+  const p = W.player;
+  p.maxHp = p.hp = 99999;
+  for (const e of W.enemies) { e.hp = 0; e.dead = true; }
+  step(0.5);
+  spawnEnemy('grunt', p.pos.x + 1, p.pos.z, 0);
+  step(1.2);
+  const g = W.enemies.find((e) => !e.dead);
+  press(0); // dash
+  damage(p, 10, g.pos, { source: g });
+  check(results, 'a hit mid-dash is a perfect dodge', p.dodgeT > 0 && W.slowmo > 0 && W.run.dodges === 1, `${W.run.dodges}`);
+  const before = g.hp;
+  damage(g, 10, p.pos, { source: p });
+  check(results, 'and your next hits land harder', before - g.hp >= 14, `${before - g.hp}`);
+  p.hp = 0; p.dead = true;
+  step(3);
+  return results;
+}
+
+// The Grave Lord rises on the fifth night in the Wilds, with a boss bar
+export async function graveLord() {
+  const results = [];
+  await toPlayMenu();
+  clickSel(1); // Open World
+  press(0);
+  await waitFor('play');
+  W.player.maxHp = W.player.hp = 99999;
+  const w = W.run.wild;
+  w.nights = 4;
+  w.clock = 0.6;
+  for (let i = 0; i < 40 && !W.enemies.some((e) => e.type === 'gravelord' && !e.dead); i++) step(0.25);
+  const g = W.enemies.find((e) => e.type === 'gravelord' && !e.dead);
+  check(results, 'the Grave Lord rises on night five', !!g && w.nights === 5, `night ${w.nights}`);
+  step(0.2);
+  check(results, 'he gets a boss bar', /GRAVE LORD/.test(document.querySelector('#boss .name').textContent) && !document.getElementById('boss').classList.contains('hidden'));
+  W.player.hp = 0; W.player.dead = true;
+  step(3);
+  await toPlayMenu();
+  clickSel(0); // back to the Dungeon card
+  return results;
+}
+
+// The Shrine: one bargain; Iron Debt pays ash now and toughens foes until three fights are cleared
+export async function shrine() {
+  const results = [];
+  await toTitle();
+  press(0);
+  await waitFor('play');
+  W.player.maxHp = W.player.hp = 99999;
+  W.run.depth = 4;
+  const d = W.room.doors[0];
+  Object.assign(d, { kind: 'shrine', reward: 'shrine', locked: false });
+  W.room.openDoors();
+  d.open = true;
+  await goDoor(d);
+  const sr = W.room.shrine;
+  check(results, 'a shrine door leads to the Shrine', W.room.plan.kind === 'shrine' && !!sr, W.room.plan.kind);
+  const ash = W.run.ash;
+  W.player.pos.copy(sr.pos).add(new THREE.Vector3(1.2, 0, 1.2));
+  step(0.1);
+  press(5);
+  step(0.5);
+  clickSel(1); // Iron Debt
+  step(0.1);
+  check(results, 'Iron Debt pays 120 ash and leaves a debt', W.run.ash === ash + 120 && W.run.curse?.id === 'iron' && sr.used, `${W.run.ash - ash} ash`);
+  spawnEnemy('grunt', W.player.pos.x + 2, W.player.pos.z, 0);
+  step(1.2);
+  const g = W.enemies.find((e) => !e.dead && e.type === 'grunt');
+  check(results, 'while it lasts, foes are tougher', g?.maxHp === Math.round(TYPES.grunt.hp * 1.4), `${g?.maxHp}`);
+  W.player.hp = 0; W.player.dead = true;
+  step(3);
+  return results;
+}

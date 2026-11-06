@@ -227,6 +227,8 @@ export function rollDoors(depth, run) {
   ];
   if (next >= 3) pool.push({ kind: 'elite', reward: 'boon' }, { kind: 'elite', reward: 'key' }, { kind: 'combat', reward: 'pom' });
   if (next >= 2) pool.push({ kind: 'fountain', reward: 'heal' });
+  if (next >= 3) pool.push({ kind: 'shop', reward: 'shop' });
+  if (next >= 4) pool.push({ kind: 'shrine', reward: 'shrine' });
   const a = pick(pool);
   let b = pick(pool);
   for (let i = 0; i < 10 && b.kind === a.kind && b.reward === a.reward; i++) b = pick(pool);
@@ -244,7 +246,7 @@ export function rollDoors(depth, run) {
 
 // ---- XP levels within a run ----
 
-export const XP_FOR = { zombie: 2, crawler: 3, bloater: 6, grunt: 3, hexer: 4, stalker: 5, sapper: 3, whirler: 7, slinger: 4, shieldbearer: 6, bonecaller: 6, brute: 9, warden: 40, prior: 40, reaver: 40, drowned: 4, tidecaller: 5, lurker: 6, drownedking: 50 };
+export const XP_FOR = { zombie: 2, crawler: 3, bloater: 6, grunt: 3, hexer: 4, stalker: 5, sapper: 3, whirler: 7, slinger: 4, shieldbearer: 6, bonecaller: 6, brute: 9, warden: 40, prior: 40, reaver: 40, drowned: 4, tidecaller: 5, lurker: 6, drownedking: 50, gravelord: 40 };
 export const xpToNext = (level) => 10 + (level - 1) * 8;
 
 export const PERKS = [

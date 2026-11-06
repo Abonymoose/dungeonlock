@@ -22,6 +22,7 @@ import { makePrincess } from './models.js';
 import { updateTouch } from './touch.js';
 import { keepPlan, furnishKeep, keepUpdate } from './keep.js';
 import { earn } from './feats.js';
+import { WARES, priceOf, furnishShop, BARGAINS, furnishShrine } from './shop.js';
 
 const CLASS_IDS = Object.keys(CLASSES);
 let hadPad = false;
@@ -32,10 +33,12 @@ const BANNERS = {
   elite: ['ELITE', 'Something heavy stirs.'],
   vault: ['VAULT', 'Your key bought this.'],
   fountain: ['FOUNTAIN', 'Drink, and go on.'],
+  shop: ['THE PEDDLER', 'Spend your ash. It will not save you down here.'],
+  shrine: ['THE SHRINE', 'The Lock will deal, for a price.'],
   exit: ['THE LOCK', 'One key, one way out. Or go deeper.'],
   wild: ['THE WILDS', 'Gather by day. Survive the night.'],
 };
-const REWARD_NAME = { boon: 'Boon', ash: 'Ash', key: 'Key', heal: 'Healing', pom: 'Keystone' };
+const REWARD_NAME = { boon: 'Boon', ash: 'Ash', key: 'Key', heal: 'Healing', pom: 'Keystone', shop: 'The Peddler', shrine: 'A Bargain' };
 
 // ---- world setup ----
 
@@ -97,6 +100,8 @@ async function enterRoom(plan) {
   const room = world.room = plan.kind === 'wild' || plan.kind === 'field' ? buildWild(plan) : buildRoom(plan, plan.doorPlans ?? rollDoors(plan.depth, world.run));
   if (plan.kind === 'wild' || plan.kind === 'field') playTrack(plan.kind === 'wild' ? 'wilds' : 'adventure');
   if (plan.kind === 'keep') furnishKeep(room);
+  if (plan.kind === 'shop') furnishShop(room);
+  if (plan.kind === 'shrine') furnishShrine(room);
   world.run.hurt = false;
   dungeonFeats(false);
   const p = world.player;
@@ -111,7 +116,7 @@ async function enterRoom(plan) {
 
   if (!plan.waves.length) room.cleared = true;
   if (plan.kind === 'vault') { room.addPickup('boon', room.center.x - 1.2, room.center.z, plan.patron); room.addPickup('heal', room.center.x + 1.2, room.center.z); }
-  if (['start', 'fountain', 'exit', 'vault', 'keep'].includes(plan.kind)) room.openDoors();
+  if (['start', 'fountain', 'exit', 'vault', 'keep', 'shop', 'shrine'].includes(plan.kind)) room.openDoors();
   world.waveDelay = plan.waves.length ? 0.9 : 0;
 
   const reward = plan.patron ? `${PATRONS[plan.patron].name}'s Boon` : REWARD_NAME[plan.reward];
@@ -175,6 +180,8 @@ function spawnWave() {
 function clearRoom() {
   const room = world.room, kind = room.plan.kind;
   room.cleared = true;
+  const c = world.run.curse;
+  if (c && room.plan.waves.length && --c.rooms <= 0) { world.run.curse = null; ui.toast(`<b>${c.name.toUpperCase()} PAID</b><span>The Lock is satisfied.</span>`); }
   dungeonFeats(true);
   world.slowmo = 0.8; // the last kill lands in slow motion
   ui.showBanner(kind === 'boss' ? TYPES[room.plan.waves[0][0]].name.toUpperCase() + ' FALLS' : 'CLEARED', '', 1400);
@@ -199,6 +206,7 @@ function dungeonFeats(cleared) {
   if (depth >= 20) earn('depth20');
   if (depth >= 5 && settings.hardcore) earn('hardcore');
   if (world.player.boons.length >= 6) earn('collector');
+  if ((run.dodges ?? 0) >= 10) earn('dodger');
   if (!cleared) return;
   if (room.plan.waves.length) earn('firstblood');
   if (depth >= 5 && room.plan.waves.length && !run.hurt) earn('untouched');
@@ -245,13 +253,14 @@ function boonCard(p, b) {
   };
 }
 
-function openBoon(pid) {
+function openBoon(pid, epic = false) {
   const p = world.player, pat = PATRONS[pid];
+  const offer = () => offerBoons(pid, p, anvil()).map((b) => (epic && ['common', 'rare'].includes(b.rarity) ? { ...b, rarity: 'epic' } : b));
   openChoice({
     header: { name: pat.name, title: pat.title, css: pat.css },
-    items: offerBoons(pid, p, anvil()),
+    items: offer(),
     toCard: (b) => boonCard(p, b),
-    reroll: () => offerBoons(pid, p, anvil()),
+    reroll: offer,
     onPick: (b) => {
       takeBoon(p, b);
       world.run.boons.push(b.id);
@@ -286,6 +295,54 @@ function openKeystone() {
 }
 
 // Crafting in the Wilds: the same pick-a-card screen, showing what each thing costs; Back closes it
+// The Peddler's stall: pay with the ash you carry this run; each ware once per visit
+function openShop() {
+  const run = world.run, p = world.player, shop = world.room.shop, depth = world.room.plan.depth;
+  const price = (w) => priceOf(w, depth);
+  const can = (w) => !shop.sold.has(w.id) && run.ash >= price(w) && !(w.id === 'keystone' && !p.boons.length);
+  openChoice({
+    header: { name: 'The Peddler', title: `You carry ${run.ash} ash`, css: '#D4C5AC' },
+    items: WARES, cancel: true, canPick: can,
+    toCard: (w) => ({ kind: 'WARE', name: w.name, desc: w.desc, note: shop.sold.has(w.id) ? 'Sold' : `${price(w)} ash`, css: can(w) ? '#D4C5AC' : '#6E2323' }),
+    onPick: (w) => {
+      run.ash -= price(w);
+      shop.sold.add(w.id);
+      run.bought = (run.bought ?? 0) + 1;
+      if (run.bought >= 3) earn('merchant');
+      sfx('unlock');
+      if (w.id === 'draught') heal(p, p.maxHp * 0.4);
+      else if (w.id === 'key') { run.keys++; floatText(p.pos, '+1 KEY', 'crit'); }
+      else if (w.id === 'vigor') { p.maxHp += 15; heal(p, 15); }
+      else if (w.id === 'boon') return openBoon(Object.keys(PATRONS)[Math.floor(Math.random() * Object.keys(PATRONS).length)]);
+      else if (w.id === 'keystone') return openKeystone();
+    },
+  });
+}
+
+// The Shrine: one bargain per shrine; a debt lasts three cleared rooms
+function openShrine() {
+  const run = world.run, p = world.player, shrine = world.room.shrine;
+  openChoice({
+    header: { name: 'The Shrine', title: 'Strike one bargain', css: '#9B1C1C' },
+    items: BARGAINS, cancel: true, canPick: (b) => !(b.curse && run.curse),
+    toCard: (b) => ({ kind: 'BARGAIN', name: b.name, desc: b.desc, note: b.curse && run.curse ? 'You already owe a debt' : '', css: '#9B1C1C' }),
+    onPick: (b) => {
+      shrine.used = true;
+      shrine.orb.material.color.setHex(C.ONYX);
+      earn('shrine');
+      sfx('slam');
+      if (b.curse) run.curse = { id: b.id, name: b.curse, rooms: 3 };
+      if (b.id === 'blood') {
+        p.maxHp = Math.max(1, Math.round(p.maxHp * 0.8));
+        p.hp = Math.min(p.hp, p.maxHp);
+        return openBoon(Object.keys(PATRONS)[Math.floor(Math.random() * Object.keys(PATRONS).length)], true);
+      }
+      if (b.id === 'iron') { run.ash += 120; floatText(p.pos, '+120 ash', 'ash'); }
+      if (b.id === 'glass') { run.keys++; floatText(p.pos, '+1 KEY', 'crit'); return openKeystone(); }
+    },
+  });
+}
+
 function openCraft() {
   openChoice({
     header: { name: 'Crafting', title: 'Spend what you gathered', css: '#D4C5AC' },
@@ -322,6 +379,12 @@ function roomLogic(dt) {
   }
   let wildPrompt = null;
   if (world.adventure) run.label = `CHAPTER ${world.adventure.chapter + 1}<br>${world.adventure.iron} IRON`;
+  // a Dungeon fight shows what is left of it under the depth
+  else if (!run.keep && !world.tutorial && room.plan.kind !== 'wild') {
+    const left = world.enemies.filter((e) => !e.dead).length + world.pendingSpawns, waves = room.plan.waves.length;
+    const debt = run.curse ? `<br><span class="red">${run.curse.name.toUpperCase()} (${run.curse.rooms})</span>` : '';
+    run.label = (room.cleared || !waves ? `DEPTH ${room.plan.depth}` : `DEPTH ${room.plan.depth}<br>${left} LEFT${waves > 1 ? ` &nbsp;WAVE ${Math.max(1, room.waveIndex)} OF ${waves}` : ''}`) + debt;
+  }
   if (room.plan.kind === 'field') {
     const f = adventureUpdate(room);
     if (f.exit) return finishChapter();
@@ -372,6 +435,23 @@ function roomLogic(dt) {
     return door.kind === 'home' ? leaveTutorial(true) : door.kind === 'adv' ? finishChapter() : enterRoom(makePlan(run.depth + 1, door.kind, door.reward, door.patron));
   }
 
+  const sr = room.shrine;
+  if (sr && !sr.used) {
+    sr.orb.rotation.y += dt;
+    if (sr.pos.distanceTo(p.pos) < 2.2) {
+      prompt = `${btn('interact')}STRIKE A BARGAIN`;
+      if (pressed('interact')) return openShrine();
+    }
+  }
+  const sh = room.shop;
+  if (sh) {
+    sh.model.anim.update(dt);
+    sh.glow.position.y = 2.1 + Math.sin(performance.now() / 300) * 0.08;
+    if (sh.pos.distanceTo(p.pos) < 2) {
+      prompt = `${btn('interact')}TRADE <span class="dim">${run.ash} ASH</span>`;
+      if (pressed('interact')) return openShop();
+    }
+  }
   const f = room.fountain;
   if (f && !f.used && p.pos.distanceTo(f.pos) < 2.2) {
     prompt = `${btn('interact')}DRINK`;

@@ -334,12 +334,17 @@ export function wildUpdate(dt) {
   let dawn = false;
   if (before < NIGHT && w.clock >= NIGHT) {
     w.nights++;
-    ui.showBanner(`NIGHT ${w.nights}`, 'They rise. Stay near a fire.', 1800);
+    // every fifth night the Grave Lord digs up as well
+    if (w.nights % 5 === 0) {
+      const at = room.freeSpot(p.pos, 8, 12);
+      spawnEnemy('gravelord', at.x, at.z, 1 + w.nights * 2);
+      ui.showBanner('THE GRAVE LORD', `Night ${w.nights}. Something huge is digging its way up.`, 2400);
+    } else ui.showBanner(`NIGHT ${w.nights}`, 'They rise. Stay near a fire.', 1800);
     sfx('slam');
   }
   if (before < DAWN && w.clock >= DAWN) {
     // the sun burns the dead back into the ground
-    for (const e of world.enemies) if (!e.dead) { floatText(e.pos, 'BURNS', 'burn'); burst(e.pos, 0xffa040, 10); e.hp = 0; e.dead = true; e.onDeath(); }
+    for (const e of world.enemies) if (!e.dead) { floatText(e.pos, 'BURNS', 'burn'); burst(e.pos, 0xffa040, 10); e.hp = 0; e.dead = true; e.burned = true; e.onDeath(); }
     run.depth = w.nights;
     dawn = true;
   }

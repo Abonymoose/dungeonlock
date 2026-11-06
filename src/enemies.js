@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { C } from './config.js';
 import { world } from './world.js';
-import { makeGrunt, makeZombie, makeCrawler, makeBloater, makeBandit, makeCrossbowman, makeGuard, makeSoldier, makeCaptain, makeBlackKnight, makeHexer, makeBrute, makeStalker, makeSapper, makeWhirler, makeSlinger, makeShieldbearer, makeBonecaller, makeWarden, makePrior, makeReaver, makeDrowned, makeTidecaller, makeLurker, makeDrownedKing, disposeObject } from './models.js';
+import { makeGrunt, makeZombie, makeCrawler, makeBloater, makeBandit, makeCrossbowman, makeGuard, makeSoldier, makeCaptain, makeBlackKnight, makeHexer, makeBrute, makeStalker, makeSapper, makeWhirler, makeSlinger, makeShieldbearer, makeBonecaller, makeWarden, makePrior, makeReaver, makeDrowned, makeTidecaller, makeLurker, makeDrownedKing, makeGraveLord, disposeObject } from './models.js';
+import { earn } from './feats.js';
 import { XP_FOR, xpToNext } from './run.js';
 import { updateStatus } from './boons.js';
 import { hooks, makeEntity, meleeArc, fireProjectile, aoe, telegraph, addTrail, moveEntity, tickEntity, turnToward, floatText, burst, damage, heal } from './combat.js';
@@ -13,6 +14,7 @@ const Y = new THREE.Vector3(0, 1, 0), tmp = new THREE.Vector3(), dir = new THREE
 export const TYPES = {
   zombie: { name: 'Zombie', about: 'Claws its way out of the earth at night in the Wilds and shambles toward you. The sun burns it at dawn.', model: makeZombie, hp: 40, speed: 1.9, radius: 0.33, ash: 1, rise: true, think: gruntAI },
   crawler: { name: 'Crawler', about: 'Half a body dragging itself fast through the grass. Shows a short red line, then leaps along it.', model: makeCrawler, hp: 22, speed: 3.8, radius: 0.3, ash: 1, rise: true, think: stalkerAI },
+  gravelord: { name: 'The Grave Lord', title: 'King of the Buried', boss: true, about: 'Digs his way up on every fifth night in the Wilds. Slams the ground, charges, and calls the dead up around him. He burns at dawn like the rest, if you can last that long.', model: makeGraveLord, hp: 520, speed: 2.0, radius: 0.85, armor: 0.1, ash: 40, knockResist: 0.1, stunResist: 0.25, rise: true, think: graveLordAI },
   bloater: { name: 'Bloater', about: 'Fat, slow and tough. Slams the ground around itself after a long windup, so hit it from range.', model: makeBloater, hp: 90, speed: 1.5, radius: 0.5, armor: 0.1, ash: 3, knockResist: 0.3, stunResist: 0.5, rise: true, think: bruteAI },
   // Adventure mode's people. ash is the coin they carry; iron is what an armoured man leaves for your forge.
   bandit: { name: 'Bandit', about: 'A road thief with a knife. Quick, but goes down in two or three cuts.', model: makeBandit, hp: 34, speed: 3.2, radius: 0.32, ash: 3, think: gruntAI },
@@ -65,7 +67,7 @@ export function spawnEnemy(type, x, z, depth, elite = false) {
 
 function create(type, x, z, depth, elite = false) {
   const T = TYPES[type];
-  const e = makeEntity(T.model(), { team: 1, hp: Math.round(T.hp * (1 + depth * 0.08 + Math.max(0, depth - 10) * 0.05) * (settings.hardcore ? 1.5 : 1)), radius: T.radius, speed: T.speed * (1 + Math.min(depth, 40) * 0.008), armor: T.armor ?? 0 });
+  const e = makeEntity(T.model(), { team: 1, hp: Math.round(T.hp * (1 + depth * 0.08 + Math.max(0, depth - 10) * 0.05) * (settings.hardcore ? 1.5 : 1) * (world.run?.curse?.id === 'iron' ? 1.4 : 1)), radius: T.radius, speed: T.speed * (1 + Math.min(depth, 40) * 0.008), armor: T.armor ?? 0 });
   Object.assign(e, {
     type, T, depth, state: 'recover', timer: 0.4 + Math.random() * 0.6, phase: 0, swingT: 0, walkT: 0, deadT: 0,
     knockResist: T.knockResist ?? 1, stunResist: T.stunResist ?? 1, guard: !!T.guard,
@@ -95,6 +97,7 @@ function create(type, x, z, depth, elite = false) {
 
 function onDeath(e) {
   const run = world.run, p = world.player;
+  if (e.type === 'gravelord' && !e.burned) earn('gravelord');
   // a volatile elite goes off a moment after it falls
   if (e.affix === 'volatile') {
     const at = e.pos.clone();
@@ -131,6 +134,7 @@ export function summonAlly(type, x, z, depth, life) {
   e.model.body.traverse((o) => { if (o.isMesh && o.name.endsWith('_Eyes')) o.material.color.setHex(0x9ff08a); });
   for (const m of e.model.mats) m.color.multiply(new THREE.Color(0xb8e0b0));
   allies.push(e);
+  if (allies.length >= 4) earn('army');
   return e;
 }
 function crumble(a) { burst(a.pos, 0x9ff08a, 12); disposeObject(a.model.root); }
@@ -503,6 +507,30 @@ function lunge(e, k) {
   windup(e, { shape: 'line', length: 6, width: 1.0, duration: 0.5 * k }, () => {
     Object.assign(e, { state: 'charging', chargeT: 6 / 18, chargeHit: false, chargeDir: line, chargeSpeed: 18, chargeDmg: 16 });
   }, e.chain > 0 ? 0 : 1.3 * k);
+}
+
+// Boss of the Wilds: slams, a lumbering charge, and more of the dead around him
+function graveLordAI(e, p, dt) {
+  if (e.state === 'charging') return chargeStep(e, p, dt);
+  if (e.state === 'windup') return;
+  const enraged = e.hp < e.maxHp / 2, k = enraged ? 0.75 : 1;
+  e.timer -= dt;
+  const d = face(e, p);
+  if (e.timer > 0) return walk(e, d > 2.5 ? 0.8 : 0);
+  const move = d < 3 ? 0 : e.phase++ % 3;
+  if (move === 0) {
+    windup(e, { shape: 'circle', radius: 3.2, duration: 1.0 * k }, () => { aoe(e, { pos: e.pos, radius: 3.2, damage: 24 + e.depth, knockback: 11 }); world.shake = 0.4; sfx('slam'); }, 1.0 * k);
+  } else if (move === 1) {
+    windup(e, { shape: 'circle', radius: 1.2, duration: 0.9 }, () => {
+      floatText(e.pos, 'RISE!', 'crit');
+      for (let i = 0; i < (enraged ? 4 : 2); i++) { const at = near(e.pos, 2.6); spawnEnemy('zombie', at.x, at.z, e.depth); }
+    }, 1.2);
+  } else {
+    const line = e.facing.clone();
+    windup(e, { shape: 'line', length: 8, width: 1.6, duration: 0.85 * k }, () => {
+      Object.assign(e, { state: 'charging', chargeT: 8 / 13, chargeHit: false, chargeDir: line, chargeSpeed: 13, chargeDmg: 22 + e.depth });
+    }, 0.3);
+  }
 }
 
 // A grunt that hits harder and slows you when it connects
