@@ -71,6 +71,7 @@ export function damage(target, amount, from, { knockback = 0, stun = 0, crit = f
   if (target.team === 0 && hooks.playerHurt) amount = hooks.playerHurt(source, amount);
   if (target.team === 0 && settings.hardcore) amount *= 1.5;
   if (target.team === 0 && world.run) world.run.hurt = true;
+  if (target.team === 0 && source?.affix === 'vampiric' && !source.dead) heal(source, amount * 2); // it drinks what it takes
   // a shieldbearer takes a fifth of any hit that comes from in front of it
   if (target.guard && from && guardV.subVectors(from, target.pos).setY(0).dot(target.facing) > 0.3 * guardV.length()) { amount *= 0.2; floatText(target.pos, 'BLOCK', 'status'); }
   amount = Math.max(1, Math.round(amount * (1 - target.armor)));
@@ -134,6 +135,7 @@ export function meleeArc(owner, { range, arc, damage: dmg, knockback = 4, stun =
 }
 
 export function fireProjectile({ owner, dir, pos = owner.pos, speed = 12, damage: dmg, range = 10, size = 0.14, color, knockback = 2, stun = 0, pierce = false, onHit = null, onExpire = null, tag = null }) {
+  if (owner.ally) color = ALLY_GREEN;
   const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(size), basic(color));
   mesh.position.set(pos.x, 0.55, pos.z);
   scene.add(mesh);
@@ -156,14 +158,17 @@ export function aoe(owner, { pos, radius, damage: dmg, knockback = 6, stun = 0, 
 }
 
 // Crimson ground warning that fills up, then fires. Cancelled if its owner dies or is stunned: that's the opening.
+export const ALLY_GREEN = 0x9ff08a;
 export function telegraph({ owner = null, shape, pos, dir = null, radius = 1, arc = Math.PI, length = 6, width = 0.5, duration, onDone, onCancel }) {
   const group = new THREE.Group();
   group.position.set(pos.x, 0.03, pos.z);
   const geo = shape === 'line'
     ? new THREE.PlaneGeometry(length, width).translate(length / 2, 0, 0)
     : new THREE.CircleGeometry(radius, 24, shape === 'arc' ? -arc / 2 : 0, shape === 'arc' ? arc : Math.PI * 2);
-  const outline = new THREE.Mesh(geo, basic(C.CRIMSON, { transparent: true, opacity: 0.22, depthWrite: false }));
-  const fill = new THREE.Mesh(geo, basic(C.CRIMSON, { transparent: true, opacity: 0.5, depthWrite: false }));
+  // danger is crimson; an ally's windup is a faint green, so it never reads as a threat
+  const hue = owner?.ally ? ALLY_GREEN : C.CRIMSON, faint = owner?.ally ? 0.4 : 1;
+  const outline = new THREE.Mesh(geo, basic(hue, { transparent: true, opacity: 0.22 * faint, depthWrite: false }));
+  const fill = new THREE.Mesh(geo, basic(hue, { transparent: true, opacity: 0.5 * faint, depthWrite: false }));
   outline.rotation.x = fill.rotation.x = -Math.PI / 2;
   fill.position.y = 0.01;
   group.add(outline, fill);

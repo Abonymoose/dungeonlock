@@ -66,7 +66,7 @@ export async function all() {
   const c = W.room.center;
 
   // class portraits, in the warm start room
-  for (const id of ['knight', 'rogue', 'wizard', 'barbarian']) {
+  for (const id of ['knight', 'rogue', 'wizard', 'barbarian', 'necromancer']) {
     swap(id);
     W.player.pos.copy(c);
     W.player.model.root.rotation.y = FACE_CAMERA;
@@ -293,5 +293,28 @@ export async function newShots() {
   W.player.pos.copy(W.room.keep.people[0].pos).add({ x: 1.4, y: 0, z: 0.6 });
   T.step(0.3);
   out.push(await shot('biome-keep', W.room.center, { zoom: 1.1 }));
+  return out;
+}
+
+// Portraits for classes added later (the Barbarian and the Necromancer).  Run:  await S.classShots();
+export async function classShots(ids = ['barbarian', 'necromancer']) {
+  const out = [];
+  await T.toTitle();
+  T.press(0);
+  await T.waitFor('play');
+  W.player.maxHp = W.player.hp = 9999;
+  const c = W.room.center;
+  for (const e of W.enemies) { e.hp = 0; e.dead = true; }
+  T.step(1);
+  for (const id of ids) {
+    swap(id);
+    W.player.pos.copy(c);
+    W.player.model.root.rotation.y = FACE_CAMERA;
+    W.player.model.anim.loop('idle');
+    W.player.model.anim.update(0.4);
+    out.push(await shot('class-' + id, c, { zoom: 2.6, w: 120, h: 132 }));
+  }
+  W.player.hp = 0; W.player.dead = true;
+  T.step(3);
   return out;
 }

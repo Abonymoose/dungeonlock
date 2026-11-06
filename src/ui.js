@@ -221,10 +221,13 @@ export function overScreen(result) {
   showScreen(`
     <h1>${t}</h1><div class="tag">${sub}</div>
     <div class="panel list">
-      <div class="item"><span>Class</span><span>${result.className}</span></div>
+      <div class="item"><span>Class</span><span>${result.className}${result.weapon ? `, ${result.weapon}` : ''}</span></div>
       <div class="item"><span>${result.adventure ? 'Chapter' : result.wild ? 'Nights survived' : 'Depth'}</span><span>${result.depth}</span></div>
       <div class="item"><span>Kills</span><span>${result.kills}</span></div>
       <div class="item"><span>Ash banked</span><span>${result.ash}</span></div>
+      ${result.time ? `<div class="item"><span>Time</span><span>${result.time}</span></div>` : ''}
+      ${result.boons ? `<div class="item"><span>Boons carried</span><span>${result.boons}</span></div>` : ''}
+      ${result.feats ? `<div class="item"><span>Feats earned</span><span>${result.feats}</span></div>` : ''}
     </div>
     <div class="hints"><span data-sel="0">${btn('confirm')}Continue</span></div>`);
 }

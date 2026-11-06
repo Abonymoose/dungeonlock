@@ -7,7 +7,7 @@ import { settings, saveSettings, resetControls, ACTIONS } from './settings.js';
 import { startTutorial, updateTutorial } from './tutorial.js';
 import { TABS, codexBody } from './codex.js';
 import { CLASSES, CAST, WEAPONS, owns, equipped, armed, createPlayer, updatePlayer } from './classes.js';
-import { spawnEnemy, updateEnemies, bossOf, TYPES } from './enemies.js';
+import { spawnEnemy, updateEnemies, updateAllies, clearAllies, bossOf, TYPES } from './enemies.js';
 import { updateCombat, clearCombat, heal, floatText } from './combat.js';
 import { buildRoom } from './room.js';
 import { makePlan, rollDoors, rollPerks, xpToNext, meta, saveMeta, UPGRADES } from './run.js';
@@ -43,6 +43,7 @@ function resetWorld() {
   clearCombat();
   for (const e of world.enemies) disposeObject(e.model.root);
   world.enemies.length = 0;
+  clearAllies();
   world.room?.dispose();
   world.room = null;
   Object.assign(world, { pendingSpawns: 0, waveDelay: 0, hitstop: 0 });
@@ -78,7 +79,7 @@ const NO_UPGRADES = { vitality: 0, whetstone: 0, lastbreath: 0, shards: 0, quick
 const anvil = () => (settings.hardcore ? NO_UPGRADES : meta);
 
 function startRun() {
-  world.run = { depth: 0, keys: anvil().sparekey ? 1 : 0, ash: 0, kills: 0, boons: [], keyDoorsSeen: 0, xp: 0, level: 1, pendingLevels: 0, rerolls: anvil().insight };
+  world.run = { depth: 0, keys: anvil().sparekey ? 1 : 0, ash: 0, kills: 0, boons: [], keyDoorsSeen: 0, xp: 0, level: 1, pendingLevels: 0, rerolls: anvil().insight, t0: world.time, featsAtStart: Object.keys(meta.feats ?? {}).length };
   ui.hideScreen();
   newPlayer();
   world.player.lives = anvil().lastbreath;
@@ -143,7 +144,9 @@ function endRun(kind) {
   world.state = 'over';
   ui.setPrompt(null);
   ui.showHud(false);
-  ui.overScreen({ kind, className: world.player.cls.name, depth: run.depth, kills: run.kills, ash, wild });
+  const secs = Math.round(world.time - (run.t0 ?? world.time));
+  ui.overScreen({ kind, className: world.player.cls.name, weapon: world.player.cls.weapon?.name, depth: run.depth, kills: run.kills, ash, wild,
+    time: `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`, boons: world.player.boons.length, feats: Object.keys(meta.feats ?? {}).length - (run.featsAtStart ?? 0) });
 }
 
 // The Keep: the room above the dungeon where Dungeon runs begin and end. Walk, talk, use the Anvil, take the gate.
@@ -408,7 +411,7 @@ function show(state) {
   RENDER[state]?.();
 }
 
-// On the home screen all three heroes stand together in the torchlight
+// On the home screen all the heroes stand together in the torchlight
 let extras = [];
 function heroes(on) {
   for (const m of extras) disposeObject(m.root);
@@ -751,6 +754,7 @@ const STATES = {
     world.time += gdt;
     updatePlayer(p, gdt);
     updateEnemies(gdt);
+    updateAllies(gdt);
     updateCombat(gdt);
     world.room.update(gdt);
     ui.updateHud(p, world.run, xpToNext(world.run.level));

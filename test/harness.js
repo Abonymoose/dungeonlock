@@ -135,7 +135,7 @@ export async function smoke() {
   const badRooms = plans();
   check(results, 'generated rooms are all reachable', !badRooms.length, badRooms.slice(0, 3).join(', '));
   await toTitle();
-  for (const id of ['knight', 'rogue', 'wizard', 'barbarian']) {
+  for (const id of ['knight', 'rogue', 'wizard', 'barbarian', 'necromancer']) {
     await toTitle();
     press(0);
     check(results, `${id}: run starts`, await waitFor('play'), W.room?.plan.kind);
@@ -682,5 +682,36 @@ export async function crafts() {
   step(3);
   await toPlayMenu();
   clickSel(0); // back to the Dungeon card for the other tests
+  return results;
+}
+
+// The Necromancer's raised dead: they rise on his Special, hurt enemies on their own, and crumble when their time is up
+export async function allies() {
+  const results = [];
+  await toTitle();
+  for (let i = 0; i < 6 && W.player.cls.name !== 'Necromancer'; i++) { pad.buttons[15].pressed = true; step(1 / 60); pad.buttons[15].pressed = false; step(1 / 60); }
+  press(0);
+  await waitFor('play');
+  const p = W.player;
+  p.maxHp = p.hp = 99999;
+  for (const e of W.enemies) { e.hp = 0; e.dead = true; }
+  step(0.5);
+  p.pos.copy(W.room.center);
+  spawnEnemy('brute', p.pos.x + 3, p.pos.z, 0);
+  step(1.2);
+  const foe = W.enemies.find((e) => !e.dead);
+  Object.assign(foe, { timer: 99, state: 'recover', speed: 0 });
+  const before = foe.hp;
+  p.facing.set(1, 0, 0);
+  press(3);
+  step(0.1);
+  check(results, 'Raise Dead raises two skeletons', (W.allies ?? []).length === 2, `${(W.allies ?? []).length}`);
+  p.pos.x -= 4;
+  step(6);
+  check(results, 'the raised dead fight on their own', foe.hp < before || foe.dead, `${before} -> ${foe.hp}`);
+  step(7);
+  check(results, 'they crumble when their time is up', (W.allies ?? []).length === 0);
+  p.hp = 0; p.dead = true;
+  step(3);
   return results;
 }

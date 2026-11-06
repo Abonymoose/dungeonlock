@@ -43,6 +43,14 @@ export const TYPES = {
   dummy: { name: 'Dummy', model: makeGrunt, hp: 99999, speed: 0, radius: 0.33, ash: 0, knockResist: 0, think: () => {} },
 };
 
+// Elites carry one affix, named over their heads when they rise
+export const AFFIXES = {
+  swift: { name: 'Swift', about: 'moves 40% faster' },
+  ironclad: { name: 'Ironclad', about: 'wears heavy armour and barely flinches' },
+  volatile: { name: 'Volatile', about: 'bursts when it dies, after a short warning circle' },
+  vampiric: { name: 'Vampiric', about: 'heals itself when it hits you' },
+};
+
 // What the codex shows about each enemy
 export const BESTIARY = Object.entries(TYPES).filter(([k]) => k !== 'dummy').map(([id, t]) => ({ id, name: t.name, title: t.title, boss: !!t.boss, about: t.about, hp: t.hp }));
 
@@ -71,6 +79,10 @@ function create(type, x, z, depth, elite = false) {
     e.armor = Math.min(0.5, e.armor + 0.15);
     e.model.root.scale.setScalar(1.2);
     for (const m of e.model.mats) m.color.lerp(new THREE.Color(C.CRIMSON), 0.25);
+    e.affix = Object.keys(AFFIXES)[Math.floor(Math.random() * 4)];
+    if (e.affix === 'swift') e.speed *= 1.4;
+    if (e.affix === 'ironclad') { e.armor = Math.min(0.6, e.armor + 0.2); e.knockResist *= 0.4; }
+    floatText(e.pos, AFFIXES[e.affix].name.toUpperCase(), 'status');
   }
   // skeletons claw their way up out of the floor before they act
   e.model.anim.once('spawn', 0.9);
@@ -83,6 +95,11 @@ function create(type, x, z, depth, elite = false) {
 
 function onDeath(e) {
   const run = world.run, p = world.player;
+  // a volatile elite goes off a moment after it falls
+  if (e.affix === 'volatile') {
+    const at = e.pos.clone();
+    telegraph({ shape: 'circle', pos: at, radius: 2.0, duration: 0.6, onDone: () => { aoe(e, { pos: at, radius: 2.0, damage: 14 + e.depth, knockback: 8 }); sfx('slam'); } });
+  }
   run.kills++;
   run.ash += e.T.ash;
   if (world.adventure && e.T.iron) world.adventure.iron += e.T.iron;
@@ -102,6 +119,45 @@ function onDeath(e) {
   for (let k = 0; k < (e.shards ?? 0); k++) world.room.addPickup('shard', e.pos.x + (Math.random() - 0.5) * 0.6, e.pos.z + (Math.random() - 0.5) * 0.6);
   burst(e.pos, C.OAK, 14);
   sfx('kill');
+}
+
+// Raises one of the dead on your side for a while. At most four stand at once; the oldest crumbles first.
+export function summonAlly(type, x, z, depth, life) {
+  const allies = (world.allies ??= []);
+  if (allies.length >= 4) crumble(allies.shift());
+  const e = create(type, x, z, depth);
+  world.enemies.splice(world.enemies.indexOf(e), 1);
+  Object.assign(e, { team: 0, ally: true, life });
+  e.model.body.traverse((o) => { if (o.isMesh && o.name.endsWith('_Eyes')) o.material.color.setHex(0x9ff08a); });
+  for (const m of e.model.mats) m.color.multiply(new THREE.Color(0xb8e0b0));
+  allies.push(e);
+  return e;
+}
+function crumble(a) { burst(a.pos, 0x9ff08a, 12); disposeObject(a.model.root); }
+
+// Allies fight the nearest enemy, or trail after you when the room is quiet
+export function updateAllies(dt) {
+  const allies = world.allies ?? [], p = world.player;
+  for (let i = allies.length - 1; i >= 0; i--) {
+    const a = allies[i];
+    if ((a.life -= dt) <= 0 || !p || p.dead) { crumble(a); allies.splice(i, 1); continue; }
+    tickEntity(a, dt);
+    a.vel.set(0, 0, 0);
+    let target = null, best = 14;
+    for (const e of world.enemies) {
+      if (e.dead || e.riseT > 0) continue;
+      const d = e.pos.distanceTo(a.pos);
+      if (d < best) { best = d; target = e; }
+    }
+    if (target && a.stun <= 0) a.T.think(a, target, dt);
+    else if (!target && a.pos.distanceTo(p.pos) > 2.2) { face(a, p); walk(a); }
+    moveEntity(a, dt);
+    animate(a, dt);
+  }
+}
+export function clearAllies() {
+  for (const a of world.allies ?? []) disposeObject(a.model.root);
+  world.allies = [];
 }
 
 export function bossOf(enemies) {

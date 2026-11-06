@@ -1,5 +1,5 @@
 import { CLASSES, CAST, SMITH, WEAPONS } from './classes.js';
-import { BESTIARY } from './enemies.js';
+import { BESTIARY, AFFIXES } from './enemies.js';
 import { PATRONS, BOONS, describe } from './boons.js';
 import { PERKS, UPGRADES } from './run.js';
 import { settings, ACTIONS } from './settings.js';
@@ -37,6 +37,7 @@ const dungeonGrowth = (e) => `rising with depth.${e.boss ? '' : ' Elites are big
 const foes = (ids, growth) => BESTIARY.filter((e) => ids.includes(e.id)).map((e) => foe(e, typeof growth === 'function' ? growth(e) : growth)).join('');
 const WILDS_FOES = ['zombie', 'crawler', 'bloater'], STORY_FOES = ['bandit', 'crossbowman', 'guard', 'soldier', 'captain', 'blackknight'];
 const DUNGEON_FOES = BESTIARY.map((e) => e.id).filter((id) => !WILDS_FOES.includes(id) && !STORY_FOES.includes(id));
+const ELITES = () => entry('Elites', `<p>Bigger, armoured and tinted crimson, more common the deeper you go. Each carries one affix, named over its head as it rises:</p><ul>${Object.values(AFFIXES).map((a) => `<li><b>${a.name}</b>: ${a.about}.</li>`).join('')}</ul>`, 'var(--crimson)');
 
 const DEPTHS = [
   ['The Keep', 'Where every Dungeon run starts and ends: the last dry room above the dungeon. Talk to Maren, who keeps the fire and has something to say after each run, and to Rattle, a skeleton who walked out of the Lock and stayed. The Anvil is in the corner; the gate takes you to class select and down.', 'keep'],
@@ -62,7 +63,7 @@ const HARDCORE = () => entry('Hardcore', '<p>A switch in Settings, for when it g
 const SECTIONS = [
   () => Object.entries(CLASSES).map(([id, c]) => classEntry(c, 'class-' + id)).join('') + Object.keys(CLASSES).map(weaponsEntry).join(''),
 
-  () => BESTIARY.map((e) => foe(e, dungeonGrowth(e))).join(''),
+  () => ELITES() + BESTIARY.map((e) => foe(e, dungeonGrowth(e))).join(''),
 
   () => Object.entries(PATRONS).map(([id, p]) => {
     const own = Object.values(BOONS).filter((b) => b.patron === id);
@@ -97,7 +98,7 @@ export const MODES = [
       ['Classes', () => Object.entries(CLASSES).map(([id, c]) => classEntry(c, 'class-' + id)).join('')],
       ['Weapons', () => Object.keys(CLASSES).map(weaponsEntry).join('')],
       ['The Keep and the depths', () => DEPTHS.map(biome).join('')],
-      ['Enemies and bosses', () => foes(DUNGEON_FOES, dungeonGrowth)],
+      ['Enemies and bosses', () => ELITES() + foes(DUNGEON_FOES, dungeonGrowth)],
       ['Patrons and boons', SECTIONS[2]],
       ['Upgrades', SECTIONS[4]],
     ],
@@ -106,7 +107,7 @@ export const MODES = [
     id: 'wilds', name: 'The Wilds', art: 'card-open',
     intro: 'The Open World card, in beta. A huge wild island with no dungeon in sight: gather and build by day, and keep a fire lit when the dead rise at night. How many nights can you last?',
     parts: [
-      ['The island', () => entry('The Wilds', "<p>Meadow, forest, rock and lakes, far bigger than any room. You play one of the Dungeon's three classes. Zombies rise every night and burn at dawn, and each dawn brings a boon. Crawlers join from the second night, bloaters from the third.</p>", null, 'biome-wilds', true)],
+      ['The island', () => entry('The Wilds', "<p>Meadow, forest, rock and lakes, far bigger than any room. You play any of the Dungeon's classes, with the weapon you carry. Zombies rise every night and burn at dawn, and each dawn brings a boon. Crawlers join from the second night, bloaters from the third.</p>", null, 'biome-wilds', true)],
       ['Gathering and crafting', () => entry('Crafting', `<p>Press Use by trees, rocks and bushes for wood, stone and fiber. Craft with Tab, C, the View button, or the CRAFT button on a phone.</p><ul>${RECIPES.map((r) => `<li><b>${r.name}</b> (${costText(r)}): ${r.desc}</li>`).join('')}</ul>`)],
       ['The dead', () => foes(WILDS_FOES, 'more each night. From the third night some are elites: bigger, armored and tinted crimson.')],
     ],

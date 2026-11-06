@@ -3,7 +3,8 @@ import { C } from './config.js';
 import { world } from './world.js';
 import { input, pressed, isHeld, rumble } from './input.js';
 import { GROUND_RIGHT, GROUND_UP, basic, flashLight, screenToGround } from './render.js';
-import { makeKnight, makeRogue, makeWizard, makeBarbarian, makeSmith } from './models.js';
+import { makeKnight, makeRogue, makeWizard, makeBarbarian, makeNecromancer, makeSmith } from './models.js';
+import { summonAlly } from './enemies.js';
 import { hooks, makeEntity, meleeArc, fireProjectile, aoe, spawnGhost, addTrail, moveEntity, tickEntity, turnToward, opponents, damage, heal } from './combat.js';
 import { sfx } from './audio.js';
 
@@ -60,6 +61,20 @@ export const CLASSES = {
     dash: { name: 'Blink', blink: 3.4, cd: 1.0, charges: 1 },
     passive: 'Blink teleports through danger', ranged: true,
   },
+  necromancer: {
+    name: 'Necromancer', blurb: 'Frail, and never alone. The dead get up when he asks.',
+    hp: 75, speed: 5.0, armor: 0, model: makeNecromancer, swingAxis: 'x', ranged: true,
+    attack: {
+      name: 'Bone Bolt', cd: 0.36, desc: 'Bolts of bone; every third splits in three',
+      use: (p, f) => { for (const a of f.fin ? [-0.2, 0, 0.2] : [0]) fireProjectile({ owner: p, dir: aimDir.copy(p.facing).applyAxisAngle(Y, a), speed: 15, damage: 10 * p.mods.atk * f.mult, range: 10, size: 0.16, color: C.OAK, tag: 'attack' }); },
+    },
+    special: {
+      name: 'Raise Dead', cd: 6, desc: 'Two skeletons rise beside you and fight for twelve seconds',
+      use: (p) => raise(p, 'grunt', 2, 12),
+    },
+    dash: { name: 'Shade Step', speed: 14, time: 0.15, cd: 0.7, charges: 1 },
+    passive: 'The dead he raises fight beside him',
+  },
   barbarian: {
     name: 'Barbarian', blurb: 'Huge, tough and angry. The more he bleeds, the harder he hits.',
     hp: 140, speed: 4.6, armor: 0.1, model: makeBarbarian, swingAxis: 'y',
@@ -75,6 +90,15 @@ export const CLASSES = {
     passive: 'Rage: up to 50% more damage as his health runs low',
   },
 };
+
+// the Necromancer's Special: n of the dead rise around you and fight for life seconds
+function raise(p, type, n, life) {
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + Math.random();
+    const at = world.room.freeSpot(p.pos.clone().add(new THREE.Vector3(Math.cos(a) * 1.4, 0, Math.sin(a) * 1.4)), 0, 2);
+    summonAlly(type, at.x, at.z, world.run?.depth ?? 0, life);
+  }
+}
 
 // the Barbarian's passive: 1 at full health, 1.5 at none
 const rage = (p) => 1 + 0.5 * (1 - Math.max(0, p.hp) / p.maxHp);
@@ -142,6 +166,35 @@ export const WEAPONS = {
       special: {
         name: 'Smoke Bomb', cd: 1.8, desc: 'Stun everything around you, and you cannot be hit for a moment',
         use: (p) => { aoe(p, { pos: p.pos, radius: 2.4, damage: 6 * p.mods.spc, stun: 1.2, color: C.OAK, tag: 'special' }); p.invuln = Math.max(p.invuln, 0.6); },
+      },
+    },
+  ],
+  necromancer: [
+    { id: 'bonewand', name: 'Bone Wand', desc: 'Bolts of bone, and two skeletons raised to fight beside you.' },
+    {
+      id: 'gravestaff', name: 'Grave Staff', cost: 150, desc: 'Slow bolts that pass through foes and heal you for each one hit, and two skeleton archers.',
+      hide: ['Spellbook', 'Spellbook_open', '1H_Wand'],
+      anims: { attack: 'Spellcast_Long', special: 'Spellcast_Summon' },
+      attack: {
+        name: 'Grave Bolt', cd: 0.5, desc: 'A slow bolt that goes through foes; each one it hits heals you 1',
+        use: (p, f) => fireProjectile({ owner: p, dir: p.facing, speed: 10, damage: 13 * p.mods.atk * f.mult, range: 11, size: 0.2, pierce: true, color: C.OAK, tag: 'attack', onHit: () => heal(p, 1) }),
+      },
+      special: {
+        name: 'Raise Archers', cd: 7, desc: 'Two skeleton archers rise and shoot for twelve seconds',
+        use: (p) => raise(p, 'hexer', 2, 12),
+      },
+    },
+    {
+      id: 'deadbook', name: 'Book of the Dead', cost: 200, desc: 'Draining bolts at close range that heal you as they land, and one great brute raised to fight for you.',
+      hide: ['Spellbook', '1H_Wand', '2H_Staff'],
+      anims: { attack: 'Spellcast_Shoot', special: 'Spellcast_Summon' },
+      attack: {
+        name: 'Soul Drain', cd: 0.22, desc: 'Quick bolts at close range; each hit heals you 1',
+        use: (p, f) => fireProjectile({ owner: p, dir: p.facing, speed: 16, damage: 6 * p.mods.atk * f.mult, range: 6.5, size: 0.13, color: C.OAK, tag: 'attack', onHit: () => heal(p, 1) }),
+      },
+      special: {
+        name: 'Raise Brute', cd: 9, desc: 'A brute rises and fights for you for ten seconds',
+        use: (p) => raise(p, 'brute', 1, 10),
       },
     },
   ],
@@ -213,7 +266,7 @@ export const equipped = (id, meta) => WEAPONS[id].find((w) => w.id === meta.gear
 // a class with a weapon in hand: the weapon's moves over the class's
 export const armed = (id, w) => ({ ...CLASSES[id], attack: w.attack ?? CLASSES[id].attack, special: w.special ?? CLASSES[id].special, ranged: w.ranged ?? CLASSES[id].ranged, weapon: w });
 
-// Adventure mode's hero, kept apart from the three classes so he never shows on class select.
+// Adventure mode's hero, kept apart from the classes so he never shows on class select.
 // Grounded: one honest swing with a windup, and one short step. No Cast, no Special, no long dash.
 export const SMITH = {
   name: 'Swordsmith', blurb: 'A village smith with a sword he made himself.', hp: 60, speed: 4.2, armor: 0, model: makeSmith, swingAxis: 'y', grounded: true,

@@ -49,6 +49,7 @@ const LINES = {
     [[MAREN, 'I went down once. Depth six. I came back up and decided someone had better keep the fire going.']],
     [[MAREN, 'Rattle was the first skeleton ever to walk out of the Lock. He has been here so long he forgot to be frightening.']],
     [[MAREN, 'Below the first Lock the stairs run into water. I do not know why. I have stopped asking.']],
+    [[MAREN, 'There is a fifth patron now. Gale. She howls down the stairwell at night. Her lightning jumps from foe to foe, so fight her way in a crowd.']],
   ],
   idle: [[MAREN, "The gate's behind me whenever you're ready."]],
   rattle: [
@@ -61,6 +62,10 @@ const LINES = {
     [RATTLE, 'Fountains heal you halfway. I drink from them too. It all runs out the bottom, but it is the thought that counts.'],
     [RATTLE, 'The Wizard blinks right through danger. I would blink too, if I had eyelids.'],
     [RATTLE, 'Dashing makes you untouchable for a heartbeat. I have no heartbeat, so I just stand very still.'],
+    [RATTLE, 'The Necromancer raises skeletons to fight for him. Twelve seconds, then back to dust. Union rules, I think.'],
+    [RATTLE, 'The Barbarian hits harder the more he bleeds. I tried that. I just fell apart. Literally. Took an hour.'],
+    [RATTLE, 'Elites with names over their heads? Read the name. Volatile ones go bang. Vampiric ones drink. Rude, both.'],
+    [RATTLE, 'Feats pay ash the moment you do them. I earned one once: Stood In A Corner For Ninety Years. Nobody gave me ash.'],
   ],
 };
 const fill = (lines, run) => lines.map(([who, text]) => [who, text.replace('{depth}', run?.depth ?? 0)]);

@@ -32,6 +32,13 @@ export const makeBarbarian = (w = {}) => character('Barbarian', {
   anims: { ...HERO, attack: '2H_Melee_Attack_Chop', attack2: '2H_Melee_Attack_Spin', special: 'Cheer', dash: 'Jump_Full_Short', ...w.anims },
 });
 
+// the Mage again, in grave-green and black, with a wand and an open book of the dead
+export const makeNecromancer = (w = {}) => character('Mage', {
+  tint: [C.ONYX, 0x26302a, 0xb8c8a0, 0.65],
+  hide: w.hide ?? ['Spellbook', '2H_Staff'],
+  anims: { ...HERO, attack: 'Spellcast_Shoot', special: 'Spellcast_Summon', ...w.anims },
+});
+
 export const makeWizard = (w = {}) => character('Mage', {
   tint: WIZARD_TINT,
   hide: w.hide ?? ['Spellbook', 'Spellbook_open', '1H_Wand'],
