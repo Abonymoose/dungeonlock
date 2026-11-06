@@ -113,7 +113,7 @@ export function homeScreen(sel, meta) {
       <p class="home-desc">${HOME[sel][1]}</p>
       <p class="record">${record}</p>
     </div>
-    <p class="credits">Art from KayKit by Kay Lousberg and from Quaternius (CC0)</p>
+    <p class="credits">Art from KayKit by Kay Lousberg and Quaternius. Music from OpenGameArt: yd, MintoDog, Paul Wortmann, qubodup, cynicmusic and RandomMind. All CC0</p>
     <div class="hints corner"><span>${btn('confirm')}Select</span></div>`, 'home');
 }
 
@@ -143,19 +143,30 @@ export function playScreen(sel, meta) {
     <div class="hints"><span>${btn('confirm')}Enter</span><span>${btn('back')}Back</span></div>`, 'play');
 }
 
+// classes: each with the weapon it shows ({ ...class, weapon, owned, count, at }); up and down look through weapons
 export function titleScreen(classes, sel, meta, cast) {
-  const cards = Object.values(classes).map((c, i) => `
-    <div class="card ${i === sel ? 'sel' : ''}" data-sel="${i}">
+  const cards = classes.map((c, i) => {
+    const w = c.weapon, here = i === sel;
+    const price = c.owned ? '' : `<span class="${meta.ash >= w.cost ? 'cost' : 'cost red'}">${w.cost} ash</span>`;
+    const pips = Array.from({ length: c.count }, (_, k) => (k === c.at ? '&#9670;' : '&#9671;')).join('');
+    return `
+    <div class="card ${here ? 'sel' : ''}" data-sel="${i}">
       <h3>${c.name.toUpperCase()}</h3>
       <p>${c.blurb}</p>
       <p class="stat">HP ${c.hp}, speed ${c.speed}</p>
+      <div class="weapon ${c.owned ? '' : 'locked'}">
+        <div class="wname">${here ? btn('up') : ''}<b>${w.name}</b>${here ? btn('down') : ''}<span class="pips">${pips}</span></div>
+        ${price}${here ? `<small>${w.desc}</small>` : ''}
+      </div>
       ${moveRow('attack', c.attack.name)}${moveRow('special', c.special.name)}${moveRow('cast', cast.name)}${moveRow('dash', c.dash.name)}
       <p class="dim">${c.passive}</p>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+  const w = classes[sel], go = w.owned ? 'Descend' : `Buy ${w.weapon.name} (${w.weapon.cost} ash)`;
   showScreen(`
     <h2>Choose your class</h2>
     <div class="cards">${cards}</div>
-    <div class="hints"><span>${btn('confirm')}Descend</span><span>${btn('alt')}The Anvil (${meta.ash} ash)</span><span>${btn('back')}Back</span></div>`);
+    <div class="hints"><span>${btn('confirm')}${go}</span><span>${btn('up')}${btn('down')}Weapon</span><span>${btn('alt')}The Anvil (${meta.ash} ash)</span><span>${btn('back')}Back</span></div>`);
 }
 
 export function anvilScreen(upgrades, sel, meta) {

@@ -18,7 +18,7 @@ It works with a keyboard and mouse, with a controller, or on a phone held sidewa
 <td width="33%"><img src="assets/shots/card-adventure.png" alt="The swordsmith at the castle gate at dusk"></td>
 </tr>
 <tr>
-<td valign="top"><b>The Dungeon</b><br>Pick the Knight, the Rogue or the Wizard and descend. Patrons offer boons for your moves. A boss waits at depth 9, and the Lock after it needs a key. Ash from each run buys lasting upgrades at the Anvil.</td>
+<td valign="top"><b>The Dungeon</b><br>Start in the Keep, pick the Knight, the Rogue or the Wizard and one of their three weapons, and descend. Patrons offer boons for your moves. A boss waits at depth 9, and the Lock after it needs a key. Below the first Lock the dungeon floods into the Sunken Vaults, ruled by the Drowned King. Ash from each run buys lasting upgrades and new weapons.</td>
 <td valign="top"><b>The Wilds</b> (beta)<br>A huge island of meadow, forest, rock and lakes. Gather wood, stone and fiber by day and craft campfires, barricades and bandages. When night falls, the dead rise.</td>
 <td valign="top"><b>Adventure</b><br>Six chapters as a village swordsmith with no magic, only one sword. Go from your forge, down the King's Road and into the castle to fight the Black Knight and rescue the princess. Each chapter start is saved.</td>
 </tr>
@@ -63,7 +63,8 @@ src/
   render.js       low-res render, outlines, toon lighting, camera
   input.js        keyboard, mouse and controller
   touch.js        on-screen phone controls
-  classes.js      Knight, Rogue, Wizard and the Swordsmith
+  keep.js         the Keep between runs: Maren, Rattle and what they say
+  classes.js      Knight, Rogue, Wizard, their weapons, and the Swordsmith
   enemies.js      every enemy and boss, and their AI
   combat.js       hits, projectiles, telegraphs and effects
   boons.js        patrons and boons
@@ -72,7 +73,7 @@ src/
   adventure.js    Adventure chapters and the forge
   codex.js        in-game Codex, also used to build the wiki
   save.js         save file export and import
-assets/           KayKit and Quaternius models, plus screenshots for the menus
+assets/           KayKit and Quaternius models, music, and screenshots for the menus
 wiki/             the wiki site (generated from src/codex.js)
 test/             browser test harness and screenshot tools
 ```
@@ -89,6 +90,8 @@ await T.tutorial();
 await T.wilds();
 await T.adventure();
 await T.touchControls();  // the phone controls
+await T.hardcore();
+await T.keep();           // the Keep between runs
 await T.saves();
 await T.settingsCheck();
 ```
@@ -109,5 +112,6 @@ This copies only `index.html`, `src/` and `assets/` into `dist/`. Tests and tool
 
 - Characters, dungeon, forest and medieval pieces: [KayKit](https://kaylousberg.com) by Kay Lousberg (CC0)
 - Zombies: [Quaternius](https://quaternius.com) (CC0)
+- Music, all CC0 from [OpenGameArt](https://opengameart.org): "Dungeon Ambience" by yd, "Heavy Dungeon" by MintoDog, "Dark Cavern Ambient" by Paul Wortmann, "Dark Shrine Loop" by qubodup, "Dark Forest Theme" by cynicmusic, and "Medieval: The Bard's Tale" by RandomMind (see `assets/music/LICENSE.txt`)
 - Font: [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P) by CodeMan38 (OFL)
 - Rendering: [three.js](https://threejs.org)

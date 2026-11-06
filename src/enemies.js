@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { C } from './config.js';
 import { world } from './world.js';
-import { makeGrunt, makeZombie, makeCrawler, makeBloater, makeBandit, makeCrossbowman, makeGuard, makeSoldier, makeCaptain, makeBlackKnight, makeHexer, makeBrute, makeStalker, makeSapper, makeWhirler, makeSlinger, makeShieldbearer, makeBonecaller, makeWarden, makePrior, makeReaver, disposeObject } from './models.js';
+import { makeGrunt, makeZombie, makeCrawler, makeBloater, makeBandit, makeCrossbowman, makeGuard, makeSoldier, makeCaptain, makeBlackKnight, makeHexer, makeBrute, makeStalker, makeSapper, makeWhirler, makeSlinger, makeShieldbearer, makeBonecaller, makeWarden, makePrior, makeReaver, makeDrowned, makeTidecaller, makeLurker, makeDrownedKing, disposeObject } from './models.js';
 import { XP_FOR, xpToNext } from './run.js';
 import { updateStatus } from './boons.js';
 import { hooks, makeEntity, meleeArc, fireProjectile, aoe, telegraph, addTrail, moveEntity, tickEntity, turnToward, floatText, burst, damage, heal } from './combat.js';
@@ -34,6 +34,11 @@ export const TYPES = {
   warden: { name: 'The Warden', title: 'Keeper of the Lock', boss: true, about: 'Slams, volleys and charges, and calls skeletons when hurt.', model: makeWarden, hp: 420, speed: 2.4, radius: 0.85, armor: 0.1, ash: 40, knockResist: 0.1, stunResist: 0.25, think: wardenAI },
   prior: { name: 'The Hollow Prior', title: 'Speaker for the Dead', boss: true, about: 'Fires rings of bolts, rains fire on where you stand, and blinks away when you close in. Calls hexers when hurt.', model: makePrior, hp: 360, speed: 2.2, radius: 0.8, armor: 0.05, ash: 40, knockResist: 0.1, stunResist: 0.25, think: priorAI },
   reaver: { name: 'The Reaver', title: 'Blade of the Deep', boss: true, about: 'Lunges three or four times in a row, then throws a fan of knives. Calls stalkers when hurt.', model: makeReaver, hp: 380, speed: 3.4, radius: 0.75, armor: 0.05, ash: 40, knockResist: 0.15, stunResist: 0.3, think: reaverAI },
+  // the Sunken Vaults (depths 11-20, then every other ten): the drowned dead, and their king
+  drowned: { name: 'Drowned', about: 'Waterlogged and slow, but tough. Its axe drags at you: get hit and you wade for a moment.', model: makeDrowned, hp: 52, speed: 2.4, radius: 0.36, armor: 0.1, ash: 3, knockResist: 0.6, think: drownedAI },
+  tidecaller: { name: 'Tidecaller', about: 'Hangs back and throws a wave of three slow bolts. Walk between them, or close in.', model: makeTidecaller, hp: 30, speed: 2.4, radius: 0.3, ash: 4, think: tidecallerAI },
+  lurker: { name: 'Lurker', about: 'Fast and low. Lunges twice in a row along red lines, so dodge the second one too.', model: makeLurker, hp: 32, speed: 4.4, radius: 0.3, ash: 4, think: lurkerAI },
+  drownedking: { name: 'The Drowned King', title: 'Lord of the Sunken Vaults', boss: true, about: 'Sends walls of water down long lines, opens whirlpools that drag you in, and charges. Calls the drowned when hurt.', model: makeDrownedKing, hp: 460, speed: 2.3, radius: 0.85, armor: 0.1, ash: 45, knockResist: 0.1, stunResist: 0.25, think: kingAI },
   // the tutorial's training target: never moves, never attacks, never dies
   dummy: { name: 'Dummy', model: makeGrunt, hp: 99999, speed: 0, radius: 0.33, ash: 0, knockResist: 0, think: () => {} },
 };
@@ -442,6 +447,102 @@ function lunge(e, k) {
   windup(e, { shape: 'line', length: 6, width: 1.0, duration: 0.5 * k }, () => {
     Object.assign(e, { state: 'charging', chargeT: 6 / 18, chargeHit: false, chargeDir: line, chargeSpeed: 18, chargeDmg: 16 });
   }, e.chain > 0 ? 0 : 1.3 * k);
+}
+
+// A grunt that hits harder and slows you when it connects
+function drownedAI(e, p, dt) {
+  if (!ready(e, dt)) return;
+  const d = face(e, p);
+  if (d > 1.6) return walk(e);
+  windup(e, { shape: 'arc', radius: 2.0, arc: 2.0, duration: 0.7 }, () => {
+    if (meleeArc(e, { range: 2.0, arc: 2.0, damage: 12 + e.depth, knockback: 3 }).length) p.slow = Math.max(p.slow, 1.5);
+  }, 0.9);
+}
+
+// Keeps its distance and throws three slow bolts in a fan
+function tidecallerAI(e, p, dt) {
+  if (e.state === 'windup') return;
+  e.timer -= dt;
+  const d = face(e, p);
+  if (d < 5) return walk(e, -1);
+  if (d > 9) return walk(e);
+  if (e.timer > 0) return;
+  const dirs = [-0.35, 0, 0.35].map((a) => e.facing.clone().applyAxisAngle(Y, a));
+  dirs.forEach((v, i) => telegraph({
+    owner: e, shape: 'line', pos: e.pos, dir: v, length: 11, width: 0.3, duration: 0.8,
+    onDone: i ? null : () => {
+      dirs.forEach((u) => fireProjectile({ owner: e, dir: u, speed: 7, damage: 9 + e.depth, range: 11, size: 0.24, color: C.CRIMSON }));
+      e.state = 'recover'; e.timer = 1.8 + Math.random(); e.swingT = 1;
+    },
+    onCancel: i ? null : () => { e.state = 'recover'; e.timer = 0.4; },
+  }));
+  e.state = 'windup';
+  e.model.anim.once('attack', 0.8 / 0.55);
+}
+
+// Two quick lunges in a row; the second aims wherever you went
+function lurkerAI(e, p, dt) {
+  if (e.state === 'charging') return chargeStep(e, p, dt);
+  if (e.state === 'windup') return;
+  e.timer -= dt;
+  const d = face(e, p);
+  if (e.timer > 0) return e.chain > 0 || d <= 4.5 ? undefined : walk(e);
+  if (e.chain > 0) return dart(e);
+  if (d > 4.5) return walk(e);
+  e.chain = 2;
+  dart(e);
+}
+function dart(e) {
+  e.chain--;
+  const line = e.facing.clone();
+  windup(e, { shape: 'line', length: 4.5, width: 0.6, duration: 0.45 }, () => {
+    Object.assign(e, { state: 'charging', chargeT: 4.5 / 16, chargeHit: false, chargeDir: line, chargeSpeed: 16, chargeDmg: 9 + e.depth });
+  }, e.chain > 0 ? 0 : 1.1 + Math.random() * 0.5);
+}
+
+// Boss of the Sunken Vaults: walls of water down long lines, whirlpools where you stand, and a charge. Calls the drowned when hurt.
+function kingAI(e, p, dt) {
+  if (e.state === 'charging') return chargeStep(e, p, dt);
+  if (e.state === 'windup') return;
+  const enraged = e.hp < e.maxHp / 2, k = enraged ? 0.75 : 1;
+  e.timer -= dt;
+  const d = face(e, p);
+  if (e.timer > 0) return walk(e, d > 3 ? 0.6 : 0);
+  if (enraged && !e.called) {
+    e.called = true;
+    floatText(e.pos, 'RISE!', 'crit');
+    for (let i = 0; i < 3; i++) { const at = near(e.pos, 2.4); spawnEnemy('drowned', at.x, at.z, e.depth); }
+  }
+  const move = e.phase++ % 3;
+  if (move === 0) {
+    // a wall of water down a long line; two crossing walls once he is hurt
+    const dirs = (enraged ? [-0.5, 0.5] : [0]).map((a) => e.facing.clone().applyAxisAngle(Y, a));
+    dirs.forEach((v, i) => telegraph({
+      owner: e, shape: 'line', pos: e.pos, dir: v, length: 14, width: 1.8, duration: 0.9 * k,
+      onDone: i ? null : () => {
+        dirs.forEach((u) => fireProjectile({ owner: e, dir: u, speed: 9, damage: 20, range: 14, size: 0.85, pierce: true, knockback: 8, color: C.CRIMSON }));
+        e.state = 'recover'; e.timer = 1.0 * k; e.swingT = 1;
+      },
+      onCancel: i ? null : () => { e.state = 'recover'; e.timer = 0.3; },
+    }));
+    e.state = 'windup';
+    e.model.anim.once('attack', 0.9 * k / 0.55);
+  } else if (move === 1) {
+    // a whirlpool where you stand: it drags you to the middle as it bursts, and leaves you wading
+    const at = p.pos.clone();
+    e.state = 'windup';
+    e.model.anim.once('cast', 1.1 * k / 0.6);
+    telegraph({
+      owner: e, shape: 'circle', pos: at, radius: 2.8, duration: 1.1 * k,
+      onDone: () => { aoe(e, { pos: at, radius: 2.8, damage: 18, knockback: -7, slow: 1.5 }); world.shake = 0.3; sfx('slam'); e.state = 'recover'; e.timer = 1.0 * k; },
+      onCancel: () => { e.state = 'recover'; e.timer = 0.3; },
+    });
+  } else {
+    const line = e.facing.clone();
+    windup(e, { shape: 'line', length: 9, width: 1.6, duration: 0.8 * k }, () => {
+      Object.assign(e, { state: 'charging', chargeT: 9 / 15, chargeHit: false, chargeDir: line, chargeSpeed: 15, chargeDmg: 22 });
+    }, 0.2);
+  }
 }
 
 // ---- body language ----

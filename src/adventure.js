@@ -15,7 +15,7 @@ const AFTERNOON = { sky: 0xd2e4f4, ground: 0x4a5c36, sun: 0xfff2d8, amb: 1.55, s
 const DUSK = { sky: 0xa08088, ground: 0x2a2224, sun: 0xffa878, amb: 1.0, sunI: 1.7, grade: [1.0, 0.82, 0.72] };
 // the castle inside: warm torchlight on pale stone, red banners
 const CASTLE = { name: 'The Castle', glow: 1.1, amb: 0.85, torch: 0xffb060, sky: 0x8a7060, ground: 0x151313, sun: 0xd8c8b0, grade: [1.0, 0.9, 0.76],
-  stone: 0xf2e6d8, embers: 0xffc080, abyss: 0x3a2e28, slabs: 0.5, broken: 0.03, rubble: 2, stains: 2 };
+  stone: 0xf2e6d8, embers: 0xffc080, abyss: 0x3a2e28, slabs: 0.5, broken: 0.03, rubble: 2, stains: 2, music: 'adventure' };
 
 export const CHAPTERS = [
   {

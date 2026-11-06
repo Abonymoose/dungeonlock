@@ -12,22 +12,23 @@ const SKEL = { idle: 'Idle_Combat', run: 'Running_C', hit: 'Hit_A', death: 'Deat
 // palette ramps per class: [dark, mid, light, strength]
 const KNIGHT_TINT = [C.ONYX, C.CHOC, C.OAK, 0.55], ROGUE_TINT = [C.ONYX, C.CHOC, C.OAK, 0.55], WIZARD_TINT = [C.ONYX, 0x4a2838, C.OAK, 0.5];
 
-export const makeKnight = () => character('Knight', {
+// w is the weapon (classes.js WEAPONS): its hide list and clips replace the defaults
+export const makeKnight = (w = {}) => character('Knight', {
   tint: KNIGHT_TINT,
-  hide: ['1H_Sword_Offhand', 'Badge_Shield', 'Rectangle_Shield', 'Spike_Shield', '2H_Sword'],
-  anims: { ...HERO, attack: '1H_Melee_Attack_Slice_Horizontal', attack2: '1H_Melee_Attack_Slice_Diagonal', special: 'Block_Attack' },
+  hide: w.hide ?? ['1H_Sword_Offhand', 'Badge_Shield', 'Rectangle_Shield', 'Spike_Shield', '2H_Sword'],
+  anims: { ...HERO, attack: '1H_Melee_Attack_Slice_Horizontal', attack2: '1H_Melee_Attack_Slice_Diagonal', special: 'Block_Attack', ...w.anims },
 });
 
-export const makeRogue = () => character('Rogue_Hooded', {
+export const makeRogue = (w = {}) => character('Rogue_Hooded', {
   tint: ROGUE_TINT,
-  hide: ['1H_Crossbow', '2H_Crossbow', 'Throwable'],
-  anims: { ...HERO, attack: 'Dualwield_Melee_Attack_Stab', attack2: 'Dualwield_Melee_Attack_Slice', special: 'Throw' },
+  hide: w.hide ?? ['1H_Crossbow', '2H_Crossbow', 'Throwable'],
+  anims: { ...HERO, attack: 'Dualwield_Melee_Attack_Stab', attack2: 'Dualwield_Melee_Attack_Slice', special: 'Throw', ...w.anims },
 });
 
-export const makeWizard = () => character('Mage', {
+export const makeWizard = (w = {}) => character('Mage', {
   tint: WIZARD_TINT,
-  hide: ['Spellbook', 'Spellbook_open', '1H_Wand'],
-  anims: { ...HERO, attack: 'Spellcast_Shoot', special: 'Spellcast_Raise' },
+  hide: w.hide ?? ['Spellbook', 'Spellbook_open', '1H_Wand'],
+  anims: { ...HERO, attack: 'Spellcast_Shoot', special: 'Spellcast_Raise', ...w.anims },
 });
 
 // ---- enemies: skeletons with crimson eyes, so danger always reads as red ----
@@ -124,22 +125,38 @@ export const makeSmith = () => character('Barbarian', {
   anims: { ...HERO, attack: '1H_Melee_Attack_Slice_Diagonal', dash: 'Dodge_Backward', dashF: 'Dodge_Forward', dashL: 'Dodge_Left', dashR: 'Dodge_Right', cheer: 'Cheer' },
 });
 // the Mage without hat, staff or books, in rose and gold, with a little crown
-export const makePrincess = () => {
-  const m = character('Mage', { tint: [0x3a1428, 0xc85a8a, 0xFFE6C8, 0.6], hide: ['Spellbook', 'Spellbook_open', '1H_Wand', '2H_Staff', 'Mage_Hat'], anims: { idle: 'Idle', cheer: 'Cheer', run: 'Walking_A' } });
-  // unlit gold, so it reads at a glance even in a dim tower
-  const crown = new THREE.Group(), gold = basic(0xF0C040);
-  crown.add(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.36, 0.16, 8), gold));
+// a simple crown, unlit so it reads at a glance even in a dim room; y is its height in the head bone's space
+function crown(m, color, y) {
+  const c = new THREE.Group(), mat = basic(color);
+  c.add(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.36, 0.16, 8), mat));
   for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2, spike = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.2, 4), gold);
+    const a = (i / 5) * Math.PI * 2, spike = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.2, 4), mat);
     spike.position.set(Math.cos(a) * 0.33, 0.17, Math.sin(a) * 0.33);
-    crown.add(spike);
+    c.add(spike);
   }
   let head = null;
   m.body.traverse((o) => { if (!head && o.isBone && /^head$/i.test(o.name)) head = o; });
-  crown.position.set(0, 1.05, 0); // just above the hair, in the head bone's space
-  (head ?? m.body).add(crown);
+  c.position.set(0, y, 0);
+  (head ?? m.body).add(c);
   return m;
-};
+}
+export const makePrincess = () => crown(character('Mage', { tint: [0x3a1428, 0xc85a8a, 0xFFE6C8, 0.6], hide: ['Spellbook', 'Spellbook_open', '1H_Wand', '2H_Staff', 'Mage_Hat'], anims: { idle: 'Idle', cheer: 'Cheer', run: 'Walking_A' } }), 0xF0C040, 1.05);
+
+// ---- the Sunken Vaults: the drowned dead, sea-green and waterlogged ----
+const soak = (m, color) => { for (const mat of m.mats) mat.color.multiply(new THREE.Color(color)); return m; };
+export const makeDrowned = () => soak(skeleton('Skeleton_Warrior', {
+  scale: 0.55, lend: [['Barbarian', '1H_Axe', 'handslotr']], anims: { ...SKEL, run: 'Walking_B', attack: '1H_Melee_Attack_Chop' },
+}), 0x9ad8cc);
+export const makeTidecaller = () => soak(skeleton('Skeleton_Mage', {
+  lend: [['Mage', '1H_Wand', 'handslotr']], anims: { ...SKEL, attack: 'Spellcast_Shoot' },
+}), 0x8cc8e8);
+export const makeLurker = () => soak(skeleton('Skeleton_Rogue', {
+  scale: 0.46, lend: [['Rogue_Hooded', 'Knife', 'handslotr']], anims: { ...SKEL, run: 'Running_A', attack: '1H_Melee_Attack_Stab' },
+}), 0x7ab8b0);
+export const makeDrownedKing = () => crown(soak(skeleton('Skeleton_Warrior', {
+  scale: 1.2, lend: [['Knight', '2H_Sword', 'handslotr']],
+  anims: { ...SKEL, run: 'Walking_D_Skeletons', attack: '2H_Melee_Attack_Chop', cast: 'Spellcast_Summon' },
+}), 0x88d0e0), 0x2a8a7c, 1.0);
 export const makeBandit = () => character('Rogue_Hooded', {
   tint: [C.ONYX, 0x8a5a3a, 0xE0C8A0, 0.95], hide: ['1H_Crossbow', '2H_Crossbow', 'Throwable', 'Knife_Offhand'],
   anims: { ...HUMAN, attack: 'Dualwield_Melee_Attack_Stab' },

@@ -40,9 +40,7 @@ export async function chapter(i) {
     meta.adventure.chapter = i;
     T.press(0);
   } else {
-    await T.toTitle();
-    T.press(1);
-    T.step(0.1);
+    await T.toPlayMenu();
     T.clickSel(2); // Adventure
   }
   for (let t = 0; t < 80 && W.state !== 'talk'; t++) { await T.sleep(100); T.step(0.02); }

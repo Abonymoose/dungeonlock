@@ -15,7 +15,7 @@ const behind = (p) => (t) => tmp.subVectors(p.pos, t.pos).setY(0).normalize().do
 // Every class can reach every room; they differ only in how they handle danger.
 export const CLASSES = {
   knight: {
-    name: 'Knight', blurb: 'Slow and armored. Wide sword arcs, and a shield charge that stuns.',
+    name: 'Knight', blurb: 'Slow and armored. Shrugs off hits that would floor anyone else.',
     hp: 120, speed: 4.4, armor: 0.2, model: makeKnight, swingAxis: 'y',
     attack: {
       name: 'Cleave', cd: 0.42, desc: 'Wide sword arcs; every third is a heavy sweep',
@@ -29,7 +29,7 @@ export const CLASSES = {
     passive: 'Takes 20% less damage',
   },
   rogue: {
-    name: 'Rogue', blurb: 'Fast and fragile. Quick stabs that crit from behind, and two dashes.',
+    name: 'Rogue', blurb: 'Fast and fragile, and the only one with two dashes.',
     hp: 70, speed: 6.4, armor: 0, model: makeRogue, swingAxis: 'y',
     attack: {
       name: 'Stab', cd: 0.2, desc: 'Fast jabs, double damage from behind',
@@ -47,7 +47,7 @@ export const CLASSES = {
     passive: 'Two dash charges',
   },
   wizard: {
-    name: 'Wizard', blurb: 'Fights from range. Arcane bolts, a freezing nova, and a blink.',
+    name: 'Wizard', blurb: 'Frail, and fights from range. Blinks through danger instead of rolling.',
     hp: 80, speed: 5.2, armor: 0, model: makeWizard, swingAxis: 'x',
     attack: {
       name: 'Arcane Bolt', cd: 0.34, desc: 'Magic bolts; every third pierces',
@@ -58,9 +58,114 @@ export const CLASSES = {
       use: (p) => aoe(p, { pos: p.pos, radius: 3, damage: 16 * p.mods.spc, knockback: 7, stun: 0.9, slow: 2, color: C.SAND, tag: 'special' }),
     },
     dash: { name: 'Blink', blink: 3.4, cd: 1.0, charges: 1 },
-    passive: 'Blink teleports through danger',
+    passive: 'Blink teleports through danger', ranged: true,
   },
 };
+
+// Three weapons per class. The first is the class as it comes; the others cost ash once, on class select.
+// A weapon brings its own Attack and Special (and what the hero holds); health, dash and passive stay the class's.
+export const WEAPONS = {
+  knight: [
+    { id: 'sword', name: 'Sword and Shield', desc: 'Wide sword arcs, and a shield charge that stuns.' },
+    {
+      id: 'greatsword', name: 'Greatsword', cost: 150, desc: 'Two hands, slow and wide. Heavy sweeps, and a slam that stuns everything near you.',
+      hide: ['1H_Sword', '1H_Sword_Offhand', 'Badge_Shield', 'Rectangle_Shield', 'Spike_Shield', 'Round_Shield'],
+      anims: { attack: '2H_Melee_Attack_Slice', attack2: '2H_Melee_Attack_Spin', special: '2H_Melee_Attack_Chop' },
+      attack: {
+        name: 'Sweep', cd: 0.6, desc: 'Slow, wide sweeps; every third spins all the way round',
+        use: (p, f) => meleeArc(p, { range: f.fin ? 2.6 : 2.4, arc: f.fin ? Math.PI * 2 : 3.0, damage: 24 * p.mods.atk * f.mult, knockback: f.fin ? 12 : 8, heavy: f.fin, tag: 'attack' }),
+      },
+      special: {
+        name: 'Earthsplitter', cd: 2.2, desc: 'Slam the ground and stun everything around you',
+        use: (p) => { aoe(p, { pos: p.pos, radius: 3.2, damage: 22 * p.mods.spc, knockback: 10, stun: 0.8, color: C.SAND, tag: 'special' }); world.shake = 0.3; },
+      },
+    },
+    {
+      id: 'twinblades', name: 'Twin Blades', cost: 200, desc: 'A sword in each hand and no shield. Quick cuts, and a lunge that carries you through a crowd.',
+      hide: ['Badge_Shield', 'Rectangle_Shield', 'Spike_Shield', 'Round_Shield', '2H_Sword'],
+      anims: { attack: 'Dualwield_Melee_Attack_Slice', attack2: 'Dualwield_Melee_Attack_Chop', special: 'Dualwield_Melee_Attack_Stab' },
+      attack: {
+        name: 'Flurry', cd: 0.24, desc: 'Fast crossing cuts',
+        use: (p, f) => meleeArc(p, { range: 1.7, arc: 2.2, damage: 10 * p.mods.atk * f.mult, knockback: f.fin ? 7 : 3, heavy: f.fin, tag: 'attack' }),
+      },
+      special: {
+        name: 'Lunge', cd: 1.2, desc: 'Leap forward and cut everything in your path',
+        use: (p) => {
+          p.knock.addScaledVector(p.facing, 16);
+          p.invuln = Math.max(p.invuln, 0.25);
+          addTrail(() => (p.knock.lengthSq() > 4 ? p.pos.clone().setY(0.45) : undefined), C.SAND, 0.7);
+          aoe(p, { pos: p.pos.clone().addScaledVector(p.facing, 1.8), radius: 1.7, damage: 22 * p.mods.spc, knockback: 6, color: C.SAND, tag: 'special' });
+        },
+      },
+    },
+  ],
+  rogue: [
+    { id: 'daggers', name: 'Daggers', desc: 'Fast stabs that crit from behind, and a fan of knives.' },
+    {
+      id: 'crossbow', name: 'Crossbow', cost: 150, ranged: true, desc: 'Fight from range. Heavy bolts that punch through on every third shot, and a volley of five.',
+      hide: ['1H_Crossbow', 'Throwable', 'Knife', 'Knife_Offhand'],
+      anims: { attack: '2H_Ranged_Shoot', attack2: '2H_Ranged_Shoot', special: '2H_Ranged_Shoot' },
+      attack: {
+        name: 'Bolt', cd: 0.5, desc: 'Heavy bolts; every third goes through',
+        use: (p, f) => fireProjectile({ owner: p, dir: p.facing, speed: 22, damage: 15 * p.mods.atk * f.mult, range: 14, size: f.fin ? 0.22 : 0.15, pierce: f.fin, color: C.SAND, tag: 'attack' }),
+      },
+      special: {
+        name: 'Volley', cd: 1.3, desc: 'Five bolts in a wide spread',
+        use: (p) => { for (const a of [-0.4, -0.2, 0, 0.2, 0.4]) fireProjectile({ owner: p, dir: aimDir.copy(p.facing).applyAxisAngle(Y, a), speed: 20, damage: 11 * p.mods.spc, range: 11, color: C.SAND, tag: 'special' }); },
+      },
+    },
+    {
+      id: 'knives', name: 'Throwing Knives', cost: 200, ranged: true, desc: 'Very fast throws at short range, and a smoke bomb that stuns everything around you.',
+      hide: ['1H_Crossbow', '2H_Crossbow', 'Knife', 'Knife_Offhand'],
+      anims: { attack: 'Throw', attack2: 'Throw', special: 'Throw' },
+      attack: {
+        name: 'Toss', cd: 0.2, desc: 'Quick knives at short range',
+        use: (p, f) => fireProjectile({ owner: p, dir: p.facing, speed: 18, damage: 8 * p.mods.atk * f.mult, range: 7, size: 0.12, color: C.SAND, tag: 'attack' }),
+      },
+      special: {
+        name: 'Smoke Bomb', cd: 1.8, desc: 'Stun everything around you, and you cannot be hit for a moment',
+        use: (p) => { aoe(p, { pos: p.pos, radius: 2.4, damage: 6 * p.mods.spc, stun: 1.2, color: C.OAK, tag: 'special' }); p.invuln = Math.max(p.invuln, 0.6); },
+      },
+    },
+  ],
+  wizard: [
+    { id: 'staff', name: 'Staff', desc: 'Arcane bolts that pierce on every third, and a freezing nova.' },
+    {
+      id: 'wand', name: 'Wand', cost: 150, ranged: true, desc: 'Rapid sparks that fan out on every third, and three slow orbs that go through everything.',
+      hide: ['Spellbook_open', '2H_Staff'],
+      anims: { attack: 'Spellcast_Shoot', special: 'Spellcast_Summon' },
+      attack: {
+        name: 'Spark', cd: 0.16, desc: 'Fast little sparks; every third fans out',
+        use: (p, f) => { for (const a of f.fin ? [-0.15, 0, 0.15] : [0]) fireProjectile({ owner: p, dir: aimDir.copy(p.facing).applyAxisAngle(Y, a), speed: 18, damage: 6 * p.mods.atk * f.mult, range: 9, size: 0.12, color: C.SAND, tag: 'attack' }); },
+      },
+      special: {
+        name: 'Arcane Orbs', cd: 2.0, desc: 'Three slow orbs that pass through every foe',
+        use: (p) => { for (const a of [-0.35, 0, 0.35]) fireProjectile({ owner: p, dir: aimDir.copy(p.facing).applyAxisAngle(Y, a), speed: 6, damage: 14 * p.mods.spc, range: 9, size: 0.32, pierce: true, color: C.SAND, tag: 'special' }); },
+      },
+    },
+    {
+      id: 'tome', name: 'Book of Storms', cost: 200, ranged: true, desc: 'Slow hexes that burst where they land, and a well that drags foes together.',
+      hide: ['Spellbook', '1H_Wand', '2H_Staff'],
+      anims: { attack: 'Spellcast_Shoot', special: 'Spellcast_Raise' },
+      attack: {
+        name: 'Hex Burst', cd: 0.55, desc: 'A slow hex that bursts where it lands',
+        use: (p, f) => {
+          const burstAt = (pos) => aoe(p, { pos, radius: f.fin ? 2.0 : 1.5, damage: 12 * p.mods.atk * f.mult, knockback: 4, color: C.SAND, tag: 'attack' });
+          fireProjectile({ owner: p, dir: p.facing, speed: 11, damage: 6 * p.mods.atk * f.mult, range: 9, size: 0.22, color: C.SAND, tag: 'attack', onHit: (t) => burstAt(t.pos.clone()), onExpire: burstAt });
+        },
+      },
+      special: {
+        name: 'Gravity Well', cd: 2.4, desc: 'Drag everything near a point in front of you into it',
+        use: (p) => aoe(p, { pos: p.pos.clone().addScaledVector(p.facing, 3.5), radius: 3.2, damage: 12 * p.mods.spc, knockback: -9, slow: 2, color: C.SAND, tag: 'special' }),
+      },
+    },
+  ],
+};
+// which weapons a save owns and has equipped; the first of each class is always owned
+export const owns = (meta, w) => !w.cost || !!meta.owned?.includes(w.id);
+export const equipped = (id, meta) => WEAPONS[id].find((w) => w.id === meta.gear?.[id] && owns(meta, w)) ?? WEAPONS[id][0];
+// a class with a weapon in hand: the weapon's moves over the class's
+export const armed = (id, w) => ({ ...CLASSES[id], attack: w.attack ?? CLASSES[id].attack, special: w.special ?? CLASSES[id].special, ranged: w.ranged ?? CLASSES[id].ranged, weapon: w });
 
 // Adventure mode's hero, kept apart from the three classes so he never shows on class select.
 // Grounded: one honest swing with a windup, and one short step. No Cast, no Special, no long dash.
@@ -88,10 +193,10 @@ function cast(p) {
   });
 }
 
-export function createPlayer(id, meta) {
-  const cls = id === 'smith' ? SMITH : CLASSES[id];
+export function createPlayer(id, meta, weapon = null) {
+  const cls = id === 'smith' ? SMITH : armed(id, weapon ?? WEAPONS[id][0]);
   if (cls.grounded) meta = { vitality: 0, whetstone: 0, shards: -2, quickstep: 0 }; // the Anvil's upgrades are for the dungeon; his come from his own forge
-  const model = cls.model();
+  const model = cls.model(cls.weapon);
   // x-ray silhouette: draws only where something stands in front of the player, so you never lose them
   const xray = basic(C.SAND, { transparent: true, opacity: 0.45, depthFunc: THREE.GreaterDepth, depthWrite: false });
   const meshes = [];
@@ -213,7 +318,7 @@ export function updatePlayer(p, dt) {
   }
 
   // hold attack to keep swinging; special is one press per use
-  const reach = p.id === 'wizard' ? 10 : 3;
+  const reach = cls.ranged ? 10 : 3;
   if (cls.attack.windup && isHeld('attack') && p.atkCd <= 0 && !busy) {
     // the swordsmith: draw back, then cut. The blow lands after the windup, so timing matters.
     p.atkCd = cls.attack.cd * p.mods.atkCd;

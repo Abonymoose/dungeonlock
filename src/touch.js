@@ -66,8 +66,9 @@ root.addEventListener('touchcancel', end);
 
 // tappable hints in menus and prompts: the button itself, or the whole hint around a lone button
 addEventListener('click', (e) => {
-  if (e.target.closest('[data-sel], [data-tab]')) return; // menus handle their own items
-  const b = e.target.closest('[data-act]') ?? e.target.closest('.hints > span')?.querySelector('[data-act]');
+  const own = e.target.closest('.weapon [data-act]'); // the weapon arrows inside a class card
+  if (!own && e.target.closest('[data-sel], [data-tab]')) return; // menus handle their own items
+  const b = own ?? e.target.closest('[data-act]') ?? e.target.closest('.hints > span')?.querySelector('[data-act]');
   if (b) touch.taps.add(b.dataset.act);
 });
 

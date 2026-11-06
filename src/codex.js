@@ -1,4 +1,4 @@
-import { CLASSES, CAST, SMITH } from './classes.js';
+import { CLASSES, CAST, SMITH, WEAPONS } from './classes.js';
 import { BESTIARY } from './enemies.js';
 import { PATRONS, BOONS, describe } from './boons.js';
 import { PERKS, UPGRADES } from './run.js';
@@ -32,18 +32,29 @@ const foes = (ids, growth) => BESTIARY.filter((e) => ids.includes(e.id)).map((e)
 const WILDS_FOES = ['zombie', 'crawler', 'bloater'], STORY_FOES = ['bandit', 'crossbowman', 'guard', 'soldier', 'captain', 'blackknight'];
 const DUNGEON_FOES = BESTIARY.map((e) => e.id).filter((id) => !WILDS_FOES.includes(id) && !STORY_FOES.includes(id));
 
-const BIOMES = [
+const DEPTHS = [
+  ['The Keep', 'Where every Dungeon run starts and ends: the last dry room above the dungeon. Talk to Maren, who keeps the fire and has something to say after each run, and to Rattle, a skeleton who walked out of the Lock and stayed. The Anvil is in the corner; the gate takes you to class select and down.', 'keep'],
   ['The Cells', 'Depths 1 and 2 of every ten. Warm stone and orange torchlight.', 'cells'],
   ['The Crypt', 'Depths 3 to 5. Cold blue fire and great stone slabs.', 'crypt'],
   ['The Rot', 'Depths 6 to 8. Green light, broken floors and rubble everywhere.', 'rot'],
-  ["The Warden's Halls", 'A boss waits at depth 9: the Warden, the Hollow Prior or the Reaver, chosen at random. The Lock comes after: pay one key to escape, or take a door and go deeper. The cycle repeats every ten depths, and each lap is harder.', 'halls'],
+  ["The Warden's Halls", 'A boss waits at depth 9: the Warden, the Hollow Prior or the Reaver, chosen at random. The Lock comes after: pay one key to escape, or take a door and go deeper.', 'halls'],
+  ['The Sunken Vaults', 'Below the first Lock the stairs run into water: depths 11 to 18, and every other ten after that. Sea-green fire and standing water, and the drowned in place of the dry dead.', 'vaults'],
+  ['The Drowned Throne', 'Depth 19, where the Drowned King waits. Past him, the Lock again. The dungeon goes on for ever, each ten depths harder than the last.', 'throne'],
+];
+const BIOMES = [
+  ...DEPTHS,
   ['The Swordsmith', "Adventure mode: a story in six chapters, from your village down the King's Road, through the castle wall, courtyard and great hall, to the Black Knight at the top of the tower. No magic: Attack is one swing that lands a moment after you start it, and Dash is one quick step the way you move. Coin and iron from the men you beat buy a better blade and mail at your forge between chapters. Every chapter start is saved; falling sends you back to it.", 'adventure'],
   ['The Wilds', 'The Open World mode: a huge island of meadow, forest, rock and lakes. Press Use by trees, rocks and bushes for wood, stone and fiber, and Tab, C or the View button to craft campfires, barricades, bandages and whetstones. Zombies rise every night and burn at dawn, and each dawn brings a boon.', 'wilds'],
 ];
 const biome = ([n, t, id]) => entry(n, `<p>${t}</p>`, null, 'biome-' + id, true);
 
+// each class's three weapons; all but the first are bought once, with ash, on class select
+const weaponsEntry = (id) => entry(`${CLASSES[id].name}'s weapons`, `<p>Press up or down on class select to look through them.</p><dl>${WEAPONS[id].map((w) =>
+  `<dt>${w.name}${w.cost ? ` (${w.cost} ash)` : ''}</dt><dd>${w.desc} Attack: ${(w.attack ?? CLASSES[id].attack).name}. Special: ${(w.special ?? CLASSES[id].special).name}.</dd>`).join('')}</dl>`);
+const HARDCORE = () => entry('Hardcore', '<p>A switch in Settings, for when it gets easy. Enemies have 50% more health and hit 50% harder, elites turn up more often, and your Anvil upgrades stay switched off. Weapons you own still work.</p>');
+
 const SECTIONS = [
-  () => Object.entries(CLASSES).map(([id, c]) => classEntry(c, 'class-' + id)).join(''),
+  () => Object.entries(CLASSES).map(([id, c]) => classEntry(c, 'class-' + id)).join('') + Object.keys(CLASSES).map(weaponsEntry).join(''),
 
   () => BESTIARY.map((e) => foe(e, dungeonGrowth(e))).join(''),
 
@@ -58,8 +69,9 @@ const SECTIONS = [
 
   () => BIOMES.map(biome).join(''),
 
-  () => entry('The Anvil', `<p>Spend ash between runs. These last forever.</p><ul>${UPGRADES.map((u) => `<li><b>${u.name}</b>: ${u.desc} (up to ${u.max})</li>`).join('')}</ul>`)
-    + entry('Level-up perks', `<p>Kills give XP. Each level lets you pick one of three perks once the room is clear.</p><ul>${PERKS.map((k) => `<li><b>${k.name}</b>: ${k.desc}</li>`).join('')}</ul>`),
+  () => entry('The Anvil', `<p>Spend ash between runs, at the Anvil in the Keep. These last forever.</p><ul>${UPGRADES.map((u) => `<li><b>${u.name}</b>: ${u.desc} (up to ${u.max})</li>`).join('')}</ul>`)
+    + entry('Level-up perks', `<p>Kills give XP. Each level lets you pick one of three perks once the room is clear.</p><ul>${PERKS.map((k) => `<li><b>${k.name}</b>: ${k.desc}</li>`).join('')}</ul>`)
+    + HARDCORE(),
 
   () => entry('Moves', `<p>Change these in Settings.</p><dl>${ACTIONS.map((a) => `<dt>${a[0].toUpperCase() + a.slice(1)}</dt><dd>${settings.keys[a].map(keyName).join(' or ')}, or ${padName(settings.pad[a])} on a controller</dd>`).join('')}</dl>`)
     + entry('Moving and menus', '<p>Move with WASD, the arrow keys or the left stick. Aim with the mouse or the right stick. In menus, Enter or A selects, Esc or B goes back, and Tab or Y opens extras.</p>')
@@ -72,10 +84,11 @@ export const codexBody = (i, imgBase = 'assets/shots/') => { base = imgBase; ret
 export const MODES = [
   {
     id: 'dungeon', name: 'The Dungeon', art: 'card-dungeon',
-    intro: 'Pick a class and descend. Every room you clear pays out a boon, a key or ash, and it gets harder the deeper you go. New here? The Tutorial card on the Play menu teaches the moves in one quiet room.',
+    intro: 'Start in the Keep, pick a class and a weapon, and descend. Every room you clear pays out a boon, a key or ash, and it gets harder the deeper you go. New here? The Tutorial card on the Play menu teaches the moves in one quiet room.',
     parts: [
-      ['Classes', SECTIONS[0]],
-      ['Depths', () => BIOMES.slice(0, 4).map(biome).join('')],
+      ['Classes', () => Object.entries(CLASSES).map(([id, c]) => classEntry(c, 'class-' + id)).join('')],
+      ['Weapons', () => Object.keys(CLASSES).map(weaponsEntry).join('')],
+      ['The Keep and the depths', () => DEPTHS.map(biome).join('')],
       ['Enemies and bosses', () => foes(DUNGEON_FOES, dungeonGrowth)],
       ['Patrons and boons', SECTIONS[2]],
       ['Upgrades', SECTIONS[4]],
@@ -94,7 +107,7 @@ export const MODES = [
     id: 'adventure', name: 'Adventure', art: 'card-adventure',
     intro: 'A story in six chapters. You are a village swordsmith, the castle has fallen to a black knight, and the princess is locked in the tower. No magic: one sword, and the mail you forge yourself.',
     parts: [
-      ['The swordsmith', () => classEntry(SMITH, null) + biome(BIOMES[4])],
+      ['The swordsmith', () => classEntry(SMITH, null) + biome(BIOMES[DEPTHS.length])],
       ['Chapters', () => entry('The road to the tower', `<p>Every chapter start is saved. Fall, and you go back to the start of that chapter with your forge work kept.</p><ol>${CHAPTERS.map((c) => `<li><b>${c.title}</b>: ${c.sub}</li>`).join('')}</ol>`)],
       ['The forge', () => entry('Your forge', `<p>Coin and iron come from the men you beat. Spend them between chapters.</p><ul>${FORGE.map((f) => `<li><b>${f.name}</b>: ${f.desc} Up to ${FORGE_MAX} times.</li>`).join('')}</ul>`)],
       ['Enemies', () => foes(STORY_FOES, 'a little more each chapter.')],

@@ -1,0 +1,8 @@
+All music here is CC0 (public domain), from OpenGameArt.org.
+
+dungeon.ogg    "Dungeon Ambience" by yd                  https://opengameart.org/content/dungeon-ambience
+boss.ogg       "Heavy Dungeon" by MintoDog               https://opengameart.org/content/heavy-dungeon
+vaults.ogg     "Dark Cavern Ambient" by Paul Wortmann    https://opengameart.org/content/dark-cavern-ambient
+keep.ogg       "Dark Shrine Loop" by qubodup (after yd)  https://opengameart.org/content/dark-shrine-loop
+wilds.mp3      "Dark Forest Theme" by cynicmusic         https://opengameart.org/content/dark-forest-theme
+adventure.mp3  "Medieval: The Bard's Tale" by RandomMind https://opengameart.org/content/medieval-the-bards-tale

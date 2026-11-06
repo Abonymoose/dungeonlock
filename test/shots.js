@@ -132,8 +132,7 @@ export async function all() {
   // the Tutorial card: the training room and its dummy
   W.player.hp = 0; W.player.dead = true;
   T.step(2);
-  await T.toTitle();
-  T.press(1);
+  await T.toPlayMenu();
   T.clickSel(3); // Tutorial
   await T.waitFor('play');
   for (let i = 0; i < 50 && !W.tutorial; i++) await T.sleep(100);
@@ -178,10 +177,8 @@ export async function buildWiki() {
 // Run after all():  await S.wildShots();
 export async function wildShots() {
   const out = [];
-  await T.toTitle();
-  T.press(1); // back to the play menu, then Open World
-  T.step(0.1);
-  T.clickSel(1);
+  await T.toPlayMenu();
+  T.clickSel(1); // Open World
   T.press(0);
   await T.waitFor('play');
   W.player.maxHp = W.player.hp = 9999;
@@ -225,7 +222,7 @@ export async function adventureShots() {
   const open = async (i) => {
     meta.adventure = { chapter: i, coin: 0, iron: 0, edge: 0, reach: 0, mail: 0 };
     if (W.adventure && W.state === 'play') { W.player.hp = 0; W.player.dead = true; T.step(2); W.adventure.chapter = i; T.press(0); }
-    else { await T.toTitle(); T.press(1); T.step(0.1); T.clickSel(2); }
+    else { await T.toPlayMenu(); T.clickSel(2); }
     for (let t = 0; t < 80 && W.state !== 'talk'; t++) { await T.sleep(100); T.step(0.02); }
     for (let k = 0; k < 20 && W.state === 'talk'; k++) { T.step(0.35); T.press(0); }
     W.player.maxHp = W.player.hp = 9999;
@@ -248,5 +245,52 @@ export async function adventureShots() {
   const { saveMeta } = await import('../src/run.js');
   meta.adventure = null;
   saveMeta();
+  return out;
+}
+
+// The Sunken Vaults' foes and rooms, and the Keep, for the codex and wiki.  Run:  await S.newShots();
+export async function newShots() {
+  const out = [];
+  await T.toTitle();
+  T.press(0);
+  await T.waitFor('play');
+  W.player.maxHp = W.player.hp = 9999;
+  W.player.lives = 99;
+  await visit(12);
+  const k = W.room.center;
+  for (const type of ['drowned', 'tidecaller', 'lurker', 'drownedking']) {
+    for (const e of W.enemies) { e.hp = 0; e.dead = true; }
+    T.step(2);
+    const at = W.room.freeSpot(k, 0);
+    W.player.pos.copy(W.room.freeSpot(at, 6));
+    spawnEnemy(type, at.x, at.z, 12);
+    T.step(2.2);
+    const e = W.enemies.find((x) => !x.dead && x.type === type);
+    if (!e) { out.push(type + ' missing'); continue; }
+    Object.assign(e, { timer: 99, state: 'recover' });
+    e.facing.set(1, 0, 1).normalize();
+    e.model.root.rotation.y = FACE_CAMERA;
+    T.step(0.3);
+    const big = type === 'drownedking' ? 2.1 : 1;
+    out.push(await shot('enemy-' + type, e.pos, { zoom: 2.4 / big, w: 120, h: 132, lift: 0.6 * big }));
+  }
+  for (const [name, depth, kind] of [['vaults', 12, 'combat'], ['throne', 19, 'boss']]) {
+    await visit(depth, kind);
+    for (const e of W.enemies) { e.hp = 0; e.dead = true; }
+    W.pendingSpawns = 0;
+    T.step(2);
+    W.player.pos.copy(W.room.center).add({ x: 1.2, y: 0, z: 1.2 });
+    T.step(0.2);
+    out.push(await shot('biome-' + name, W.room.center, { zoom: 1 }));
+  }
+  // the Keep, where a run ends: Maren and Rattle by the torches
+  W.player.lives = 0;
+  W.player.hp = 0; W.player.dead = true;
+  T.step(3);
+  T.press(0);
+  for (let i = 0; i < 60 && !(W.state === 'play' && W.room?.plan.kind === 'keep'); i++) { await T.sleep(100); T.step(0.02); }
+  W.player.pos.copy(W.room.keep.people[0].pos).add({ x: 1.4, y: 0, z: 0.6 });
+  T.step(0.3);
+  out.push(await shot('biome-keep', W.room.center, { zoom: 1.1 }));
   return out;
 }

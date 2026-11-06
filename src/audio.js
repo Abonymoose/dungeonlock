@@ -55,7 +55,39 @@ export function sfx(name) {
   osc.stop(t + dur);
 }
 
-// ---- music: a low drone and slow, sparse bell notes in a minor key; each biome shifts the root ----
+// ---- music: CC0 tracks in assets/music, one per part of the game (credits in assets/music/LICENSE.txt).
+// Where a browser can't play a file (Safari and .ogg), the old drone-and-bells plays instead, keyed to the biome.
+const TRACKS = { dungeon: 'dungeon.ogg', boss: 'boss.ogg', vaults: 'vaults.ogg', keep: 'keep.ogg', wilds: 'wilds.mp3', adventure: 'adventure.mp3' };
+const playable = (file) => !!document.createElement('audio').canPlayType(file.endsWith('.ogg') ? 'audio/ogg; codecs="vorbis"' : 'audio/mpeg');
+let track = null, wanted = null, droneBus = null;
+
+// crossfades to a track by name; before the first key press or tap it just remembers the choice
+export function playTrack(name) {
+  wanted = name;
+  if (!music || track?.name === name) return;
+  if (track) {
+    const old = track;
+    old.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.5);
+    setTimeout(() => old.el.pause(), 2500);
+  }
+  track = null;
+  const file = TRACKS[name];
+  const useDrone = !file || !playable(file);
+  droneBus.gain.setTargetAtTime(useDrone ? 1 : 0, ctx.currentTime, 0.6);
+  if (useDrone) return;
+  const el = new Audio('assets/music/' + file);
+  el.loop = true;
+  const gain = ctx.createGain();
+  gain.gain.value = 0;
+  ctx.createMediaElementSource(el).connect(gain).connect(musicBus);
+  gain.gain.setTargetAtTime(0.8, ctx.currentTime, 0.8);
+  // a file that fails to load falls back to the drone
+  el.addEventListener('error', () => { if (track?.el === el) { track = null; droneBus.gain.setTargetAtTime(1, ctx.currentTime, 0.6); } });
+  el.play().catch(() => {});
+  track = { name, el, gain };
+}
+
+// ---- the fallback: a low drone and slow, sparse bell notes in a minor key; each biome shifts the root ----
 
 const ROOTS = { 'The Cells': 55, 'The Crypt': 46.25, 'The Rot': 73.42, "The Warden's Halls": 65.41 };
 const SCALE = [0, 3, 5, 7, 10, 12, 15];
@@ -63,10 +95,13 @@ let music = null, root = 55;
 
 function startMusic() {
   if (music || audio.muted || !ensure()) return;
+  droneBus = ctx.createGain();
+  droneBus.gain.value = 0;
+  droneBus.connect(musicBus);
   const lp = ctx.createBiquadFilter();
   lp.type = 'lowpass';
   lp.frequency.value = 300;
-  lp.connect(musicBus);
+  lp.connect(droneBus);
   const drones = [-6, 6].map((detune) => {
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.type = 'sawtooth';
@@ -85,18 +120,21 @@ function startMusic() {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(0.035, t + 0.03);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 2.8);
-    o.connect(g).connect(musicBus);
+    o.connect(g).connect(droneBus);
     o.start(t);
     o.stop(t + 3);
     setTimeout(bell, 1800 + Math.random() * 2800);
   };
   bell();
+  playTrack(wanted ?? 'keep');
 }
 
-export function musicFor(biomeName) {
+// a room's biome keys the fallback drone; trackName picks the real music
+export function musicFor(biomeName, trackName) {
   root = ROOTS[biomeName] ?? root;
   if (music) for (const o of music.drones) o.frequency.setTargetAtTime(root, ctx.currentTime, 1.5);
+  if (trackName) playTrack(trackName);
 }
 
 addEventListener('keydown', startMusic);
-addEventListener('mousedown', startMusic);
+addEventListener('pointerdown', startMusic);

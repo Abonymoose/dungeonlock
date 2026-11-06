@@ -17,11 +17,23 @@ export const BIOMES = {
     embers: 0xb8e070, abyss: 0x2e3a24, slabs: 0.15, broken: 0.22, rubble: 10, stains: 6 },
   halls: { name: "The Warden's Halls", glow: 1.2, amb: 0.9, torch: 0xff5a3a, sky: 0x94564a, ground: 0x160c0c, sun: 0xdcb0a8, grade: [1.0, 0.7, 0.62], stone: 0xead0c8,
     embers: 0xff5a40, abyss: 0x4a1c18, slabs: 0.35, broken: 0.08, rubble: 5, stains: 12 },
+  // the Keep, above it all: warm, tidy and quiet
+  keep: { name: 'The Keep', glow: 1.1, amb: 0.8, torch: 0xffb060, sky: 0x8a6a58, ground: 0x151210, sun: 0xd8c0a0, grade: [1.0, 0.9, 0.74], stone: 0xfff2e4,
+    embers: 0xffc080, abyss: 0x3a2c24, slabs: 0.2, broken: 0.02, rubble: 1, stains: 0, music: 'keep' },
+  // the flooded region: sea-green fire, standing water (puddle: the colour its floor stains take) and drifting bubbles
+  vaults: { name: 'The Sunken Vaults', glow: 1.6, amb: 1.15, torch: 0x5ae0d0, sky: 0x5a8a8c, ground: 0x0c1414, sun: 0xa8d0d0, grade: [0.78, 0.96, 0.96], stone: 0xc8dcd8,
+    embers: 0x90f0e8, abyss: 0x1c3638, slabs: 0.3, broken: 0.14, rubble: 6, stains: 10, puddle: 0x1f8a80, music: 'vaults' },
+  throne: { name: 'The Drowned Throne', glow: 1.5, amb: 1.0, torch: 0x3aa8ff, sky: 0x4a6a94, ground: 0x0a0e18, sun: 0xa0bce0, grade: [0.72, 0.86, 1.0], stone: 0xc0d0e4,
+    embers: 0x70c8ff, abyss: 0x182a44, slabs: 0.45, broken: 0.06, rubble: 4, stains: 12, puddle: 0x1f6a9a, music: 'vaults' },
 };
 
+// Every other ten depths (11-20, 31-40, ...) the dungeon is flooded: the Sunken Vaults, and the Drowned King's throne
+export const flooded = (depth) => depth > 0 && Math.floor((depth - 1) / (BOSS_DEPTH + 1)) % 2 === 1;
+
 export function biomeFor(depth) {
-  const k = depth % (BOSS_DEPTH + 1);
-  if (k === BOSS_DEPTH || (depth > 0 && k === 0)) return BIOMES.halls; // the Warden's room and the Lock after it
+  const k = depth % (BOSS_DEPTH + 1), wet = flooded(depth);
+  if (k === BOSS_DEPTH || (depth > 0 && k === 0)) return wet ? BIOMES.throne : BIOMES.halls; // the boss's room and the Lock after it
+  if (wet) return BIOMES.vaults;
   return k <= 2 ? BIOMES.cells : k <= 5 ? BIOMES.crypt : BIOMES.rot;
 }
 
@@ -103,7 +115,7 @@ function doorSlots(tiles, entry) {
 
 export function makePlan(depth, kind, reward = null, patron = null) {
   const combat = kind === 'combat' || kind === 'elite';
-  const size = kind === 'boss' ? 24 : combat ? 17 + 2 * rint(0, 2) : kind === 'start' ? 14 : 12;
+  const size = kind === 'boss' ? 24 : combat ? 17 + 2 * rint(0, 2) : kind === 'start' || kind === 'keep' ? 14 : 12;
   const shapes = kind === 'boss' ? ['octagon', 'cross'] : combat ? Object.keys(SHAPES) : ['octagon', 'wings'];
   let tiles, slots, entry, center, interior;
   for (let tries = 0; tries < 30; tries++) {
@@ -155,7 +167,7 @@ export function makePlan(depth, kind, reward = null, patron = null) {
       } else plan.traps = place(sets, floorOk);
     }
   }
-  plan.waves = kind === 'boss' ? [[pick(BOSSES)]] : combat ? rollWaves(depth, kind) : [];
+  plan.waves = kind === 'boss' ? [[flooded(depth) ? 'drownedking' : pick(BOSSES)]] : combat ? rollWaves(depth, kind) : [];
   return plan;
 }
 
@@ -187,9 +199,11 @@ function rollWaves(depth, kind) {
   if (depth >= 5) pool.push('hexer', 'grunt', 'stalker', 'slinger');
   if (depth >= 6) pool.push('bonecaller');
   const count = depth >= 12 ? 3 : kind === 'elite' || depth >= 4 ? 2 : 1;
+  // in the Sunken Vaults the drowned take the place of their dry cousins
+  const swap = flooded(depth) ? { grunt: 'drowned', stalker: 'lurker', hexer: 'tidecaller' } : {};
   const waves = [];
   for (let w = 0; w < count; w++) {
-    const wave = Array.from({ length: Math.min(12, 2 + Math.floor(depth * 0.5) + w) }, () => pick(pool));
+    const wave = Array.from({ length: Math.min(12, 2 + Math.floor(depth * 0.5) + w) }, () => { const t = pick(pool); return swap[t] ?? t; });
     if (kind === 'elite' || (depth >= 3 && w === count - 1 && Math.random() < 0.5)) wave.push('brute');
     if (kind === 'elite' && depth >= 5) wave.push('brute');
     waves.push(wave);
@@ -230,7 +244,7 @@ export function rollDoors(depth, run) {
 
 // ---- XP levels within a run ----
 
-export const XP_FOR = { zombie: 2, crawler: 3, bloater: 6, grunt: 3, hexer: 4, stalker: 5, sapper: 3, whirler: 7, slinger: 4, shieldbearer: 6, bonecaller: 6, brute: 9, warden: 40, prior: 40, reaver: 40 };
+export const XP_FOR = { zombie: 2, crawler: 3, bloater: 6, grunt: 3, hexer: 4, stalker: 5, sapper: 3, whirler: 7, slinger: 4, shieldbearer: 6, bonecaller: 6, brute: 9, warden: 40, prior: 40, reaver: 40, drowned: 4, tidecaller: 5, lurker: 6, drownedking: 50 };
 export const xpToNext = (level) => 10 + (level - 1) * 8;
 
 export const PERKS = [

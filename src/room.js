@@ -33,11 +33,11 @@ function place(obj, x, y, z, rotY = 0, parent) {
 }
 
 // Irregular blood stain: a jittered disc in Bitter Chocolate, the doc's "dried blood"
-function stain(x, z, r, parent) {
+function stain(x, z, r, parent, color = C.CHOC) {
   const geo = new THREE.CircleGeometry(r, 9);
   const pos = geo.attributes.position;
   for (let i = 1; i < pos.count; i++) { const k = 0.6 + Math.random() * 0.6; pos.setXY(i, pos.getX(i) * k, pos.getY(i) * k); }
-  const m = new THREE.Mesh(geo, basic(C.CHOC, { transparent: true, opacity: 0.55, depthWrite: false }));
+  const m = new THREE.Mesh(geo, basic(color, { transparent: true, opacity: 0.55, depthWrite: false }));
   m.rotation.x = -Math.PI / 2;
   m.rotation.z = Math.random() * 6;
   return place(m, x, 0.03, z, 0, parent);
@@ -56,7 +56,7 @@ export function buildRoom(plan, doorPlans) {
   const biome = plan.biome;
   setMood(biome);
   tintProps(biome.stone);
-  musicFor(biome.name);
+  musicFor(biome.name, plan.kind === 'boss' ? 'boss' : biome.music ?? 'dungeon');
   const floor = new Set(plan.tiles.map(([x, z]) => key(x, z)));
   const has = (x, z) => floor.has(key(x, z));
   const xs = plan.tiles.map((t) => t[0]), zs = plan.tiles.map((t) => t[1]);
@@ -199,7 +199,7 @@ export function buildRoom(plan, doorPlans) {
   }
   const edgeSpots = tiles.filter(([x, z]) => edge(x, z) && !nearDoor(x, z) && awayFromEntry(x, z)).map(([x, z]) => ({ x, z }));
   for (const e of spaced(edgeSpots, Math.round(biome.rubble * k), 2.5)) place(prop(rand(['rubble_half', 'sword_shield_broken']), 0.14), e.x, 0, e.z, Math.random() * 6, group);
-  for (const [x, z] of [...tiles].sort(() => Math.random() - 0.5).slice(0, Math.round(biome.stains * k))) stain(x + Math.random() - 0.5, z + Math.random() - 0.5, 0.35 + Math.random() * 0.4, group);
+  for (const [x, z] of [...tiles].sort(() => Math.random() - 0.5).slice(0, Math.round(biome.stains * k))) stain(x + Math.random() - 0.5, z + Math.random() - 0.5, (biome.puddle ? 0.55 : 0.35) + Math.random() * 0.4, group, biome.puddle);
   // ---- pillars carry a torch on the side facing the camera; a matched set shares one design ----
   const pillarKind = rand(['pillar', 'pillar_decorated']);
   for (const [x, z] of plan.pillars) {

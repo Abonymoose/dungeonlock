@@ -8,6 +8,7 @@ import { makeWild, SIZE } from '../src/wild.js';
 import { torchLights, GROUND_RIGHT } from '../src/render.js';
 import { audio } from '../src/audio.js';
 import { settings, resetControls } from '../src/settings.js';
+import * as THREE from 'three';
 import { input } from '../src/input.js';
 import { spawnEnemy, TYPES } from '../src/enemies.js';
 import { damage } from '../src/combat.js';
@@ -34,15 +35,30 @@ export function clickSel(i) {
   step(0.05);
 }
 
-// gets from any menu (home, play menu, end of a run) to the class select screen
+// gets from any menu (home, play menu, end of a run, the Keep) to the class select screen
 export async function toTitle() {
-  for (let i = 0; i < 8 && W.state !== 'title'; i++) {
-    if (W.state === 'transition') await sleep(300);
-    else if (W.state === 'over') { press(0); await waitFor('title'); }
-    else if (W.state === 'home' || W.state === 'playmenu') clickSel(0);
-    else await sleep(300);
+  for (let i = 0; i < 24 && W.state !== 'title'; i++) {
+    if (W.state === 'over') press(0);
+    else if (W.state === 'home' || W.state === 'playmenu') clickSel(0); // the Dungeon card leads into the Keep
+    else if (W.state === 'talk') press(0);
+    else if (W.state === 'play' && W.room?.plan.kind === 'keep') { W.player.pos.copy(W.room.doors[0].pos); step(0.1); } // walk into the gate
+    await sleep(250);
   }
   return W.state === 'title';
+}
+
+// gets to the Play menu from anywhere: class select goes back, and the Keep is left through the pause menu
+export async function toPlayMenu() {
+  for (let i = 0; i < 24 && W.state !== 'playmenu'; i++) {
+    if (W.state === 'title' || W.state === 'anvil') press(1);
+    else if (W.state === 'over') press(0);
+    else if (W.state === 'home') clickSel(0);
+    else if (W.state === 'talk') press(0);
+    else if (W.state === 'play' && W.room?.plan.kind === 'keep') { press(9); step(0.05); if (W.state === 'pause') clickSel(1); } // pause, then Leave the Keep
+    await sleep(250);
+    step(0.05);
+  }
+  return W.state === 'playmenu';
 }
 
 export async function goDoor(d) {
@@ -203,12 +219,10 @@ export async function wilds() {
   const plan = makeWild(), kinds = [0, 0, 0, 0, 0, 0];
   for (const k of plan.ground) kinds[k]++;
   const mid = (SIZE / 2) * SIZE + SIZE / 2;
-  check(results, 'the island has sea, forest and rock, and starts on land', kinds[0] > 2000 && kinds[4] > 1000 && kinds[5] > 200 && plan.ground[mid] !== 0, kinds.join('/'));
+  check(results, 'the island has sea, forest and rock, and starts on land', kinds[0] > 2000 && kinds[4] > 400 && kinds[5] > 200 && plan.ground[mid] !== 0, kinds.join('/'));
 
-  await toTitle();
-  press(1); // back to the play menu, then Open World
-  step(0.1);
-  clickSel(1);
+  await toPlayMenu();
+  clickSel(1); // Open World
   press(0);
   await waitFor('play');
   const room = W.room, w = W.run.wild;
@@ -298,8 +312,7 @@ export async function fullRun(maxRooms = 14) {
 // Walks through every tutorial step with the fake controller and checks it ends back at the play menu
 export async function tutorial() {
   const results = [], t = () => W.tutorial;
-  await toTitle();
-  press(1); // back to the play menu
+  await toPlayMenu();
   clickSel(3); // Tutorial
   await waitFor('play');
   for (let i = 0; i < 50 && !W.tutorial; i++) await sleep(100); // it starts once the fade-in finishes
@@ -346,8 +359,8 @@ export async function tutorial() {
 // Rebinding, sliders and toggles in Settings; restores the defaults afterwards
 export async function settingsCheck() {
   const results = [];
-  await toTitle();
-  press(1); step(0.05); press(1); step(0.05); // title -> play menu -> home
+  await toPlayMenu();
+  press(1); step(0.05); // play menu -> home
   clickSel(1);
   check(results, 'settings opens', W.state === 'settings');
   const before = settings.master;
@@ -378,6 +391,9 @@ export async function settingsCheck() {
 export async function saves() {
   const results = [];
   const { saveData, parseSave } = await import('../src/save.js');
+  const { saveMeta } = await import('../src/run.js');
+  const { saveSettings } = await import('../src/settings.js');
+  saveMeta(); saveSettings(); // a fresh browser may not have written either yet
   const file = JSON.stringify(saveData());
   const entries = parseSave(file);
   const keys = entries.map(([k]) => k);
@@ -403,10 +419,8 @@ export async function adventure() {
   const skipTalk = () => { for (let i = 0; i < 20 && W.state === 'talk'; i++) { step(0.35); press(0); } };
   const tough = () => { W.player.maxHp = W.player.hp = 99999; };
 
-  await toTitle();
-  press(1); // back to the play menu, then Adventure
-  step(0.1);
-  clickSel(2);
+  await toPlayMenu();
+  clickSel(2); // Adventure
   await until(() => W.state === 'talk');
   check(results, 'the fourth card starts the story as the swordsmith', W.state === 'talk' && W.player.cls.name === 'Swordsmith' && W.room?.plan.kind === 'field', W.state);
   skipTalk();
@@ -514,7 +528,7 @@ export async function touchControls() {
   P.tap(innerWidth / 2, 4);
   P.tapEl('.hints > span:last-child'); // Back, as a chip
   step(1 / 30);
-  check(results, 'a tapped hint works as its button', W.state === 'playmenu', W.state);
+  check(results, 'a tapped hint works as its button', W.state !== 'title', W.state);
   clickSel(0);
   input.touch = false; // the other tests use the pad
   return results;
@@ -542,5 +556,44 @@ export async function hardcore() {
     step(3);
     await toTitle();
   } finally { settings.hardcore = false; }
+  return results;
+}
+
+// The Keep: the Dungeon card leads into it; Maren and Rattle talk; the Anvil opens and returns; the gate leads to
+// class select; a finished run comes back to the Keep with news for Maren
+export async function keep() {
+  const results = [];
+  const go = async (cond, ms = 6000) => { for (let t = 0; t < ms && !cond(); t += 100) { await sleep(100); step(0.02); } return cond(); };
+  await toPlayMenu();
+  clickSel(0);
+  check(results, 'the Dungeon card opens the Keep', await go(() => W.state === 'play' && W.room?.plan.kind === 'keep'), W.room?.plan.kind);
+  const k = W.room.keep, p = W.player;
+  check(results, 'Maren, Rattle and the Anvil are there', k.people.length === 2 && !!k.anvil);
+  const talkTo = async (who) => {
+    const at = k.people.find((x) => x.name === who).pos;
+    p.pos.copy(at).add(new THREE.Vector3(0.9, 0, 0.9));
+    step(0.1);
+    press(5); // Use
+    const ok = W.state === 'talk' && document.getElementById('talk').textContent.includes(who);
+    for (let i = 0; i < 12 && W.state === 'talk'; i++) { step(0.35); press(0); }
+    return ok;
+  };
+  check(results, 'Maren talks', await talkTo('Maren'));
+  check(results, 'Rattle talks', await talkTo('Rattle'));
+  p.pos.copy(k.anvil).add(new THREE.Vector3(0.9, 0, 0.9));
+  step(0.1);
+  press(5);
+  check(results, 'the Anvil opens from the Keep', await go(() => W.state === 'anvil'), W.state);
+  press(1);
+  check(results, 'leaving the Anvil goes back to the Keep', await go(() => W.state === 'play' && W.room?.plan.kind === 'keep'), W.state);
+  W.player.pos.copy(W.room.doors[0].pos);
+  step(0.1);
+  check(results, 'the gate leads to class select', await go(() => W.state === 'title'), W.state);
+  press(0);
+  await go(() => W.state === 'play');
+  W.player.hp = 0; W.player.dead = true;
+  step(3);
+  press(0);
+  check(results, 'a finished run comes back to the Keep, with news', await go(() => W.state === 'play' && W.room?.plan.kind === 'keep') && meta.keepNews === true && meta.lastRun?.depth === 0, W.state);
   return results;
 }

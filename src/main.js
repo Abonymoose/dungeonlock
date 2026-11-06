@@ -6,7 +6,7 @@ import { pollInput, pressed, btn, rumble, input, keyName, padName } from './inpu
 import { settings, saveSettings, resetControls, ACTIONS } from './settings.js';
 import { startTutorial, updateTutorial } from './tutorial.js';
 import { TABS, codexBody } from './codex.js';
-import { CLASSES, CAST, createPlayer, updatePlayer } from './classes.js';
+import { CLASSES, CAST, WEAPONS, owns, equipped, armed, createPlayer, updatePlayer } from './classes.js';
 import { spawnEnemy, updateEnemies, bossOf, TYPES } from './enemies.js';
 import { updateCombat, clearCombat, heal, floatText } from './combat.js';
 import { buildRoom } from './room.js';
@@ -14,16 +14,17 @@ import { makePlan, rollDoors, rollPerks, xpToNext, meta, saveMeta, UPGRADES } fr
 import { PATRONS, RARITY, SLOT_NAME, BOONS, offerBoons, takeBoon, describe, value, slotIcons } from './boons.js';
 import { disposeObject } from './models.js';
 import * as ui from './ui.js';
-import { sfx, applyVolume } from './audio.js';
+import { sfx, applyVolume, playTrack } from './audio.js';
 import { exportSave, importSave } from './save.js';
 import { makeWild, buildWild, wildUpdate, RECIPES, canCraft, craft, costText } from './wild.js';
 import { CHAPTERS, ENDING, FORGE, chapterPlan, adventureUpdate, canForge, forgeCost, forge, applyForge, newAdventure } from './adventure.js';
 import { makePrincess } from './models.js';
 import { updateTouch } from './touch.js';
+import { keepPlan, furnishKeep, keepUpdate } from './keep.js';
 
 const CLASS_IDS = Object.keys(CLASSES);
 let hadPad = false;
-const menu = { home: 0, play: 0, cls: 0, anvil: 0, boon: 0, choice: null, pause: 0, set: 0, tab: 0, over: 0, click: false };
+const menu = { home: 0, play: 0, cls: 0, anvil: 0, boon: 0, choice: null, pause: 0, set: 0, tab: 0, over: 0, click: false, look: {} };
 const BANNERS = {
   start: ['DUNGEONLOCK', 'Not everything unlocks.'],
   tutorial: ['TUTORIAL', "Learn the basics. You can't lose here."],
@@ -48,7 +49,12 @@ function resetWorld() {
 
 function newPlayer() {
   if (world.player) disposeObject(world.player.model.root);
-  world.player = createPlayer(CLASS_IDS[menu.cls], anvil());
+  world.player = createPlayer(CLASS_IDS[menu.cls], anvil(), shownWeapon());
+}
+// the weapon on show for the chosen class: the one you carry, unless you are looking through the others on class select
+function shownWeapon() {
+  const id = CLASS_IDS[menu.cls], list = WEAPONS[id];
+  return list[menu.look[id] ?? list.indexOf(equipped(id, meta))];
 }
 
 // Every menu sits over the same torchlit backdrop room with the chosen class standing in it
@@ -59,6 +65,7 @@ async function enterMenu(state) {
   ui.showHud(false);
   ui.setPrompt(null);
   world.room = buildRoom(makePlan(0, 'start'), []);
+  playTrack('keep'); // the menus share the Keep's quiet music
   world.adventure = null;
   newPlayer();
   show(state);
@@ -86,6 +93,8 @@ async function enterRoom(plan) {
   resetWorld();
   world.run.depth = plan.depth;
   const room = world.room = plan.kind === 'wild' || plan.kind === 'field' ? buildWild(plan) : buildRoom(plan, plan.doorPlans ?? rollDoors(plan.depth, world.run));
+  if (plan.kind === 'wild' || plan.kind === 'field') playTrack(plan.kind === 'wild' ? 'wilds' : 'adventure');
+  if (plan.kind === 'keep') furnishKeep(room);
   const p = world.player;
   // enter from the bottom corner of the screen, facing up into the room
   p.pos.copy(room.entry);
@@ -98,7 +107,7 @@ async function enterRoom(plan) {
 
   if (!plan.waves.length) room.cleared = true;
   if (plan.kind === 'vault') { room.addPickup('boon', room.center.x - 1.2, room.center.z, plan.patron); room.addPickup('heal', room.center.x + 1.2, room.center.z); }
-  if (['start', 'fountain', 'exit', 'vault'].includes(plan.kind)) room.openDoors();
+  if (['start', 'fountain', 'exit', 'vault', 'keep'].includes(plan.kind)) room.openDoors();
   world.waveDelay = plan.waves.length ? 0.9 : 0;
 
   const reward = plan.patron ? `${PATRONS[plan.patron].name}'s Boon` : REWARD_NAME[plan.reward];
@@ -116,11 +125,15 @@ async function enterRoom(plan) {
 function endRun(kind) {
   if (world.tutorial) return leaveTutorial(false); // the tutorial never banks or counts as a run
   if (world.adventure) return adventureEnded(kind);
+  if (world.run.keep) return enterMenu('playmenu'); // leaving the Keep isn't a run
   const run = world.run, ash = Math.round((run.ash + (kind === 'escaped' ? 60 : 0)) * (1 + 0.15 * meta.greed));
   meta.ash += ash;
   meta.runs++;
   if (kind === 'escaped') meta.escapes++;
   const wild = world.room?.plan.kind === 'wild';
+  // what Maren will hear about in the Keep
+  if (!wild) meta.lastRun = { kind, depth: run.depth, boss: world.room?.plan.kind === 'boss' ? world.room.plan.waves[0]?.[0] : null, record: run.depth > meta.bestDepth, hardcore: !!settings.hardcore };
+  if (!wild) meta.keepNews = true;
   if (wild) meta.bestNights = Math.max(meta.bestNights ?? 0, run.depth); // in the Wilds, depth counts nights survived
   else meta.bestDepth = Math.max(meta.bestDepth, run.depth);
   saveMeta();
@@ -128,6 +141,17 @@ function endRun(kind) {
   ui.setPrompt(null);
   ui.showHud(false);
   ui.overScreen({ kind, className: world.player.cls.name, depth: run.depth, kills: run.kills, ash, wild });
+}
+
+// The Keep: the room above the dungeon where Dungeon runs begin and end. Walk, talk, use the Anvil, take the gate.
+function enterKeep() {
+  world.adventure = null;
+  world.run = { depth: 0, keys: 0, ash: meta.ash, kills: 0, boons: [], keyDoorsSeen: 0, xp: 0, level: 1, pendingLevels: 0, rerolls: 0, noXp: true, label: 'THE KEEP', keep: true };
+  menu.look = {};
+  ui.hideScreen();
+  newPlayer();
+  ui.setSlots([]);
+  return enterRoom(keepPlan());
 }
 
 // ---- room flow ----
@@ -281,6 +305,12 @@ function roomLogic(dt) {
     if (f.exit) return finishChapter();
     wildPrompt = f.prompt;
   }
+  if (room.plan.kind === 'keep') {
+    const k = keepUpdate(room, p, dt);
+    wildPrompt = k.prompt;
+    if (k.anvil) { menu.anvilFrom = 'keep'; return enterMenu('anvil'); }
+    if (k.lines) return talk(k.lines);
+  }
   if (room.plan.kind === 'wild') {
     const w = wildUpdate(dt);
     wildPrompt = w.prompt;
@@ -315,6 +345,7 @@ function roomLogic(dt) {
     prompt = run.keys ? `${btn('interact')}UNLOCK (1 KEY)` : '<span class="dim">LOCKED. NEEDS A KEY.</span>';
     if (pressed('interact') && run.keys) { run.keys--; room.unlock(door); }
   } else if (door?.open && door.pos.distanceTo(p.pos) < 0.8) {
+    if (door.kind === 'keep') { menu.titleFrom = 'keep'; return enterMenu('title'); } // the gate: pick a class and weapon, then down
     return door.kind === 'home' ? leaveTutorial(true) : door.kind === 'adv' ? finishChapter() : enterRoom(makePlan(run.depth + 1, door.kind, door.reward, door.patron));
   }
 
@@ -341,11 +372,14 @@ const SEL_KEY = { home: 'home', playmenu: 'play', title: 'cls', anvil: 'anvil', 
 const RENDER = {
   home: () => ui.homeScreen(menu.home, meta),
   playmenu: () => ui.playScreen(menu.play, meta),
-  title: () => ui.titleScreen(CLASSES, menu.cls, meta, CAST),
+  title: () => ui.titleScreen(CLASS_IDS.map((id, i) => {
+    const w = i === menu.cls ? shownWeapon() : equipped(id, meta);
+    return { ...armed(id, w), owned: owns(meta, w), count: WEAPONS[id].length, at: WEAPONS[id].indexOf(w) };
+  }), menu.cls, meta, CAST),
   anvil: () => ui.anvilScreen(UPGRADES, menu.anvil, meta),
   settings: () => ui.settingsScreen(settingRows(), menu.set, !!input.capture),
   codex: () => ui.codexScreen(TABS, menu.tab, codexBody(menu.tab)),
-  pause: () => ui.pauseScreen(menu.pause, world.player.cls, CAST, world.tutorial ? 'Leave the tutorial' : world.adventure ? 'Leave (your chapter is saved)' : 'Abandon run'),
+  pause: () => ui.pauseScreen(menu.pause, world.player.cls, CAST, world.tutorial ? 'Leave the tutorial' : world.adventure ? 'Leave (your chapter is saved)' : world.run.keep ? 'Leave the Keep' : 'Abandon run'),
   choice: () => renderChoice(),
 };
 function show(state) {
@@ -362,7 +396,7 @@ function heroes(on) {
   if (!on || !world.player) return;
   world.player.model.root.rotation.y = Math.PI / 4;
   CLASS_IDS.filter((_, i) => i !== menu.cls).forEach((id, k) => {
-    const m = CLASSES[id].model();
+    const m = CLASSES[id].model(equipped(id, meta));
     m.root.position.copy(world.player.pos).addScaledVector(GROUND_RIGHT, k ? 1.3 : -1.3).addScaledVector(GROUND_UP, 0.7);
     m.root.rotation.y = Math.PI / 4 + (k ? -0.5 : 0.5);
     m.anim.loop('idle');
@@ -393,6 +427,7 @@ screenEl.addEventListener('mouseover', (e) => {
 });
 screenEl.addEventListener('click', (e) => {
   if (performance.now() - (input.lastCapture ?? 0) < 400) return; // that click just finished a rebind
+  if (e.target.closest('.weapon [data-act]')) return; // the weapon arrows on a class card are buttons of their own
   const tab = e.target.closest('[data-tab]');
   if (tab && world.state === 'codex') { menu.tab = +tab.dataset.tab; return RENDER.codex(); }
   const el = e.target.closest('[data-sel]'), key = SEL_KEY[world.state];
@@ -614,20 +649,46 @@ const STATES = {
     if (card === 'tutorial') return beginTutorial();
     if (card === 'adventure') return startAdventure();
     menu.mode = card === 'open' ? 'open' : 'dungeon';
+    if (menu.mode === 'dungeon') return enterKeep();
+    menu.titleFrom = 'playmenu';
     show('title');
   },
 
   title(dt) {
     world.player.model.root.rotation.y += dt * 0.8;
     if (navigate('cls', CLASS_IDS.length, true)) return RENDER.title();
+    const id = CLASS_IDS[menu.cls], list = WEAPONS[id];
+    // up and down look through this class's weapons; one you own goes straight into your hand
+    if (pressed('up') || pressed('down')) {
+      menu.look[id] = (list.indexOf(shownWeapon()) + (pressed('down') ? 1 : list.length - 1)) % list.length;
+      const w = shownWeapon();
+      if (owns(meta, w)) { meta.gear = { ...meta.gear, [id]: w.id }; saveMeta(); }
+      newPlayer();
+      sfx('menu');
+      return RENDER.title();
+    }
     if (pressed('alt')) return show('anvil');
-    if (pressed('back')) return show('playmenu');
-    if (confirmed()) startRun();
+    if (pressed('back')) { menu.look = {}; newPlayer(); return menu.titleFrom === 'keep' ? enterKeep() : show('playmenu'); }
+    if (!confirmed()) return;
+    const w = shownWeapon();
+    if (owns(meta, w)) return startRun();
+    // a weapon you don't own yet: confirm buys it, and the next confirm descends
+    if (meta.ash < w.cost) { sfx('menu'); world.shake = 0.1; return; }
+    meta.ash -= w.cost;
+    meta.owned = [...(meta.owned ?? []), w.id];
+    meta.gear = { ...meta.gear, [id]: w.id };
+    saveMeta();
+    sfx('unlock');
+    ui.showBanner(w.name.toUpperCase(), 'Yours now.', 1400);
+    RENDER.title();
   },
 
   anvil() {
     if (navigate('anvil', UPGRADES.length)) return RENDER.anvil();
-    if (pressed('back') || pressed('alt')) return show('title');
+    if (pressed('back') || pressed('alt')) {
+      if (menu.anvilFrom === 'keep') { menu.anvilFrom = null; return enterKeep(); }
+      return show('title');
+    }
     if (!confirmed()) return;
     const u = UPGRADES[menu.anvil], lvl = meta[u.id];
     if (lvl < u.max && meta.ash >= u.cost(lvl)) { meta.ash -= u.cost(lvl); meta[u.id]++; saveMeta(); sfx('unlock'); }
@@ -713,6 +774,8 @@ const STATES = {
   over() {
     if (!confirmed()) return;
     if (world.adventure) return startAdventure(); // back to the start of the chapter you fell in
+    if (menu.mode === 'dungeon') return enterKeep(); // a Dungeon run ends back in the Keep
+    menu.titleFrom = 'playmenu';
     enterMenu('title');
   },
 };
