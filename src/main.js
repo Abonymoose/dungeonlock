@@ -610,9 +610,10 @@ const STATES = {
     if (navigate('play', 4, true)) return RENDER.playmenu();
     if (pressed('back')) return show('home');
     if (!confirmed()) return;
-    if (menu.play === 1) return beginTutorial();
-    if (menu.play === 3) return startAdventure();
-    menu.mode = menu.play === 2 ? 'open' : 'dungeon';
+    const card = ui.PLAY_CARDS[menu.play];
+    if (card === 'tutorial') return beginTutorial();
+    if (card === 'adventure') return startAdventure();
+    menu.mode = card === 'open' ? 'open' : 'dungeon';
     show('title');
   },
 

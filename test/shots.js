@@ -134,7 +134,7 @@ export async function all() {
   T.step(2);
   await T.toTitle();
   T.press(1);
-  T.clickSel(1);
+  T.clickSel(3); // Tutorial
   await T.waitFor('play');
   for (let i = 0; i < 50 && !W.tutorial; i++) await T.sleep(100);
   T.step(1.2);
@@ -179,9 +179,9 @@ export async function buildWiki() {
 export async function wildShots() {
   const out = [];
   await T.toTitle();
-  T.press(1); // back to the play menu, then the third card
+  T.press(1); // back to the play menu, then Open World
   T.step(0.1);
-  T.clickSel(2);
+  T.clickSel(1);
   T.press(0);
   await T.waitFor('play');
   W.player.maxHp = W.player.hp = 9999;
@@ -225,7 +225,7 @@ export async function adventureShots() {
   const open = async (i) => {
     meta.adventure = { chapter: i, coin: 0, iron: 0, edge: 0, reach: 0, mail: 0 };
     if (W.adventure && W.state === 'play') { W.player.hp = 0; W.player.dead = true; T.step(2); W.adventure.chapter = i; T.press(0); }
-    else { await T.toTitle(); T.press(1); T.step(0.1); T.clickSel(3); }
+    else { await T.toTitle(); T.press(1); T.step(0.1); T.clickSel(2); }
     for (let t = 0; t < 80 && W.state !== 'talk'; t++) { await T.sleep(100); T.step(0.02); }
     for (let k = 0; k < 20 && W.state === 'talk'; k++) { T.step(0.35); T.press(0); }
     W.player.maxHp = W.player.hp = 9999;

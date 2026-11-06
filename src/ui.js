@@ -119,11 +119,12 @@ export function homeScreen(sel, meta) {
 
 // The ways in, as red cards with a scene rendered from the game
 const CARDS = [
-  { name: 'Dungeon', desc: 'Pick a class and descend. It gets harder the deeper you go.', art: 'card-dungeon' },
-  { name: 'Tutorial', desc: 'Learn to move, fight, cast and take boons in one quiet room.', art: 'card-tutorial' },
-  { name: 'Open World', desc: 'Beta. A huge wild island. Gather and craft by day; zombies rise at night. How many nights can you last?', art: 'card-open' },
-  { name: 'Adventure', desc: 'A story in six chapters. You are a village swordsmith, and the princess is held in the castle. No magic: one sword.', art: 'card-adventure' },
+  { id: 'dungeon', name: 'Dungeon', desc: 'Pick a class and descend. It gets harder the deeper you go.', art: 'card-dungeon' },
+  { id: 'open', name: 'Open World', desc: 'Beta. A huge wild island. Gather and craft by day; zombies rise at night. How many nights can you last?', art: 'card-open' },
+  { id: 'adventure', name: 'Adventure', desc: 'A story in six chapters. You are a village swordsmith, and the princess is held in the castle. No magic: one sword.', art: 'card-adventure' },
+  { id: 'tutorial', name: 'Tutorial', desc: 'Learn to move, fight, cast and take boons in one quiet room.', art: 'card-tutorial' },
 ];
+export const PLAY_CARDS = CARDS.map((c) => c.id);
 export function playScreen(sel, meta) {
   const cards = CARDS.map((c, i) => `
     <div class="pcard ${c.locked ? 'locked' : ''} ${i === sel ? 'sel' : ''}" data-sel="${i}">
@@ -131,8 +132,8 @@ export function playScreen(sel, meta) {
       <div class="pbody">
         <h3>${c.name}</h3>
         <p>${c.desc}</p>
-        ${i === 1 && meta.tutorialDone ? '<p class="done">Completed</p>' : ''}
-        ${i === 3 && meta.adventure ? `<p class="done">Continue: Chapter ${meta.adventure.chapter + 1}</p>` : i === 3 && meta.adventureDone ? '<p class="done">Completed</p>' : ''}
+        ${c.id === 'tutorial' && meta.tutorialDone ? '<p class="done">Completed</p>' : ''}
+        ${c.id === 'adventure' && meta.adventure ? `<p class="done">Continue: Chapter ${meta.adventure.chapter + 1}</p>` : c.id === 'adventure' && meta.adventureDone ? '<p class="done">Completed</p>' : ''}
       </div>
     </div>`).join('');
   showScreen(`

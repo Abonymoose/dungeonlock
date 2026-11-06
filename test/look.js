@@ -43,7 +43,7 @@ export async function chapter(i) {
     await T.toTitle();
     T.press(1);
     T.step(0.1);
-    T.clickSel(3);
+    T.clickSel(2); // Adventure
   }
   for (let t = 0; t < 80 && W.state !== 'talk'; t++) { await T.sleep(100); T.step(0.02); }
   for (let k = 0; k < 20 && W.state === 'talk'; k++) { T.step(0.35); T.press(0); }

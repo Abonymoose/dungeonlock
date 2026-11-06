@@ -206,9 +206,9 @@ export async function wilds() {
   check(results, 'the island has sea, forest and rock, and starts on land', kinds[0] > 2000 && kinds[4] > 1000 && kinds[5] > 200 && plan.ground[mid] !== 0, kinds.join('/'));
 
   await toTitle();
-  press(1); // back to the play menu, then the third card
+  press(1); // back to the play menu, then Open World
   step(0.1);
-  clickSel(2);
+  clickSel(1);
   press(0);
   await waitFor('play');
   const room = W.room, w = W.run.wild;
@@ -300,7 +300,7 @@ export async function tutorial() {
   const results = [], t = () => W.tutorial;
   await toTitle();
   press(1); // back to the play menu
-  clickSel(1);
+  clickSel(3); // Tutorial
   await waitFor('play');
   for (let i = 0; i < 50 && !W.tutorial; i++) await sleep(100); // it starts once the fade-in finishes
   check(results, 'tutorial starts', !!W.tutorial, W.room?.plan.kind);
@@ -404,9 +404,9 @@ export async function adventure() {
   const tough = () => { W.player.maxHp = W.player.hp = 99999; };
 
   await toTitle();
-  press(1); // back to the play menu, then the fourth card
+  press(1); // back to the play menu, then Adventure
   step(0.1);
-  clickSel(3);
+  clickSel(2);
   await until(() => W.state === 'talk');
   check(results, 'the fourth card starts the story as the swordsmith', W.state === 'talk' && W.player.cls.name === 'Swordsmith' && W.room?.plan.kind === 'field', W.state);
   skipTalk();
