@@ -63,7 +63,7 @@ export const CLASSES = {
 };
 
 // Adventure mode's hero, kept apart from the three classes so he never shows on class select.
-// Grounded: one honest swing with a windup, and a short step back. No Cast, no Special, no long dash.
+// Grounded: one honest swing with a windup, and one short step. No Cast, no Special, no long dash.
 export const SMITH = {
   name: 'Swordsmith', blurb: 'A village smith with a sword he made himself.', hp: 60, speed: 4.2, armor: 0, model: makeSmith, swingAxis: 'y', grounded: true,
   attack: {
@@ -71,7 +71,7 @@ export const SMITH = {
     use: (p) => meleeArc(p, { range: 1.55 + (p.reach ?? 0), arc: 1.8, damage: 24 * p.mods.atk, knockback: 6, tag: 'attack' }),
   },
   special: null,
-  dash: { name: 'Step back', speed: 8.5, time: 0.14, cd: 0.7, charges: 1, back: true, invuln: 0.06 },
+  dash: { name: 'Step', speed: 8.5, time: 0.14, cd: 0.7, charges: 1, step: true, invuln: 0.06 },
   passive: 'No magic. Every hit counts',
 };
 
@@ -139,6 +139,14 @@ function assist(p, range) {
   if (best) p.facing.subVectors(best.pos, p.pos).setY(0).normalize();
 }
 
+// the dodge that matches a step's direction against where you face
+function stepAnim(p) {
+  const ahead = p.facing.dot(p.dashDir), side = p.facing.x * p.dashDir.z - p.facing.z * p.dashDir.x;
+  if (ahead > 0.7) return 'dashF';
+  if (ahead < -0.7) return 'dash';
+  return side > 0 ? 'dashR' : 'dashL';
+}
+
 // touch auto-aim: the closest living enemy within reach, if any
 let foe = null;
 function nearestFoe(p, reach = 7) {
@@ -178,10 +186,12 @@ export function updatePlayer(p, dt) {
     if (p.dashCharges === maxDashes(p)) p.dashCd = cls.dash.cd * p.mods.dashCd;
     p.dashCharges--;
     p.sinceDash = 0;
-    if (!cls.dash.blink && !cls.dash.back) addTrail(() => (p.dashT > 0 ? p.pos.clone().setY(0.45) : undefined), C.SAND, 0.7);
-    // a step back goes away from where you face and keeps you facing the fight
-    if (cls.dash.back) p.dashDir.copy(p.facing).negate();
-    else { p.dashDir.copy(move.lengthSq() > 0.01 ? move : p.facing).normalize(); p.facing.copy(p.dashDir); }
+    if (!cls.dash.blink && !cls.dash.step) addTrail(() => (p.dashT > 0 ? p.pos.clone().setY(0.45) : undefined), C.SAND, 0.7);
+    // a step goes the way you move (back when you stand still) and keeps you facing the fight
+    if (cls.dash.step) {
+      if (move.lengthSq() > 0.01) p.dashDir.copy(move).normalize();
+      else p.dashDir.copy(p.facing).negate();
+    } else { p.dashDir.copy(move.lengthSq() > 0.01 ? move : p.facing).normalize(); p.facing.copy(p.dashDir); }
     if (cls.dash.blink) {
       spawnGhost(p.model);
       p.pos.addScaledVector(p.dashDir, cls.dash.blink);
@@ -196,7 +206,7 @@ export function updatePlayer(p, dt) {
     } else {
       p.dashT = cls.dash.time;
       p.invuln = Math.max(p.invuln, cls.dash.invuln ?? cls.dash.time + 0.05);
-      p.model.anim.once('dash', cls.dash.time + 0.12);
+      p.model.anim.once(cls.dash.step ? stepAnim(p) : 'dash', cls.dash.time + 0.12);
       sfx('dash');
     }
     rumble(0.1, 0.25, 50);
@@ -256,7 +266,7 @@ export function updatePlayer(p, dt) {
     p.dashT -= dt;
     p.vel.copy(p.dashDir).multiplyScalar(cls.dash.speed);
     if (p.dashT <= 0) hooks.onDash?.(p.pos.clone());
-    if (!cls.dash.back) spawnGhost(p.model);
+    if (!cls.dash.step) spawnGhost(p.model);
   } else {
     const sp = p.speed * p.mods.speed * (p.attackLock > 0 ? 0.35 : 1);
     p.vel.lerp(move.multiplyScalar(sp), 1 - Math.exp(-20 * dt));

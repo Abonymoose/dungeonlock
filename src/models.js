@@ -121,7 +121,7 @@ export const makeSmith = () => character('Barbarian', {
   tint: [C.ONYX, 0x5a3a2a, C.OAK, 0.5],
   hide: ['1H_Axe_Offhand', 'Barbarian_Round_Shield', '1H_Axe', '2H_Axe', 'Mug', 'Barbarian_Hat', 'Barbarian_Cape'],
   lend: [['Knight', '1H_Sword', 'handslotr']],
-  anims: { ...HERO, attack: '1H_Melee_Attack_Slice_Diagonal', dash: 'Dodge_Backward', cheer: 'Cheer' },
+  anims: { ...HERO, attack: '1H_Melee_Attack_Slice_Diagonal', dash: 'Dodge_Backward', dashF: 'Dodge_Forward', dashL: 'Dodge_Left', dashR: 'Dodge_Right', cheer: 'Cheer' },
 });
 // the Mage without hat, staff or books, in rose and gold, with a little crown
 export const makePrincess = () => {

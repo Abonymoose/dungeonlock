@@ -5,7 +5,7 @@ import { world as W } from '../src/world.js';
 import { createPlayer } from '../src/classes.js';
 import { meta, makePlan } from '../src/run.js';
 import { makeWild, SIZE } from '../src/wild.js';
-import { torchLights } from '../src/render.js';
+import { torchLights, GROUND_RIGHT } from '../src/render.js';
 import { audio } from '../src/audio.js';
 import { settings, resetControls } from '../src/settings.js';
 import { input } from '../src/input.js';
@@ -420,6 +420,12 @@ export async function adventure() {
   press(0); // Dash
   step(0.3);
   check(results, 'no Cast, no Special, and Dash steps back', p.maxAmmo === 0 && spc <= 0 && p.pos.x < from.x - 0.4, `moved ${(p.pos.x - from.x).toFixed(2)}`);
+  step(0.8); // the step comes back
+  pad.axes[0] = 1; // walking right on the stick
+  frame(1 / 60);
+  press(0);
+  pad.axes[0] = 0;
+  check(results, 'Dash steps the way you walk', p.dashDir.dot(GROUND_RIGHT) > 0.9, p.dashDir.toArray().map((v) => v.toFixed(2)).join(','));
 
   const plan = W.room.plan, ambush = plan.triggers[0];
   p.pos.set(plan.exit[0], 0, plan.exit[1]);

@@ -26,7 +26,7 @@ export const CHAPTERS = [
       ['Old Marta', 'Riders came in the night. A black knight holds the castle, and the princess is locked in the tower.'],
       ['Old Marta', 'The soldiers ran. You still have the blade you finished yesterday.'],
       ['You', 'Then someone has to go.'],
-      ['', 'Attack swings your sword; it lands a moment after you start, so time it. Dash takes one step back. There is no magic in this.'],
+      ['', 'Attack swings your sword; it lands a moment after you start, so time it. Dash takes one quick step the way you move, or back if you stand still. There is no magic in this.'],
     ],
   },
   {
