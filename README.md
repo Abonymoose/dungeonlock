@@ -42,6 +42,8 @@ New players can start with the **Tutorial** card on the Play menu. It teaches th
 
 You can rebind keys and buttons in Settings. Settings can also export your progress to a file and import it back.
 
+Finding it easy? Turn on **Hardcore** in Settings. Enemies get 50% more health and hit 50% harder, elites show up more often, and your Anvil upgrades stay switched off.
+
 ## Run it locally
 
 You need [Node.js](https://nodejs.org). Nothing else has to be installed.

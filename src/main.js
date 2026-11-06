@@ -48,7 +48,7 @@ function resetWorld() {
 
 function newPlayer() {
   if (world.player) disposeObject(world.player.model.root);
-  world.player = createPlayer(CLASS_IDS[menu.cls], meta);
+  world.player = createPlayer(CLASS_IDS[menu.cls], anvil());
 }
 
 // Every menu sits over the same torchlit backdrop room with the chosen class standing in it
@@ -65,11 +65,15 @@ async function enterMenu(state) {
   await ui.fadeTo(false);
 }
 
+// Hardcore leaves the Anvil's help at home (Greed still pays out)
+const NO_UPGRADES = { vitality: 0, whetstone: 0, lastbreath: 0, shards: 0, quickstep: 0, favor: 0, insight: 0, sparekey: 0 };
+const anvil = () => (settings.hardcore ? NO_UPGRADES : meta);
+
 function startRun() {
-  world.run = { depth: 0, keys: meta.sparekey ? 1 : 0, ash: 0, kills: 0, boons: [], keyDoorsSeen: 0, xp: 0, level: 1, pendingLevels: 0, rerolls: meta.insight };
+  world.run = { depth: 0, keys: anvil().sparekey ? 1 : 0, ash: 0, kills: 0, boons: [], keyDoorsSeen: 0, xp: 0, level: 1, pendingLevels: 0, rerolls: anvil().insight };
   ui.hideScreen();
   newPlayer();
-  world.player.lives = meta.lastbreath;
+  world.player.lives = anvil().lastbreath;
   ui.setSlots([]);
   enterRoom(menu.mode === 'open' ? makeWild() : makePlan(0, 'start'));
 }
@@ -133,7 +137,7 @@ function spawnWave() {
   for (const type of types) {
     if (TYPES[type].boss) { spawnEnemy(type, room.center.x - 2, room.center.z - 2, room.plan.depth); continue; }
     const { x, z } = room.freeSpot(p.pos, 4.5);
-    const eliteOdds = room.plan.kind === 'elite' ? 0.35 : Math.min(0.5, Math.max(0, room.plan.depth - 4) * 0.03);
+    const eliteOdds = room.plan.kind === 'elite' ? 0.35 : Math.min(0.5, Math.max(0, room.plan.depth - 4) * 0.03 + (settings.hardcore ? 0.15 : 0));
     spawnEnemy(type, x, z, room.plan.depth, type !== 'brute' && Math.random() < eliteOdds);
   }
 }
@@ -199,9 +203,9 @@ function openBoon(pid) {
   const p = world.player, pat = PATRONS[pid];
   openChoice({
     header: { name: pat.name, title: pat.title, css: pat.css },
-    items: offerBoons(pid, p, meta),
+    items: offerBoons(pid, p, anvil()),
     toCard: (b) => boonCard(p, b),
-    reroll: () => offerBoons(pid, p, meta),
+    reroll: () => offerBoons(pid, p, anvil()),
     onPick: (b) => {
       takeBoon(p, b);
       world.run.boons.push(b.id);
@@ -411,6 +415,7 @@ function settingRows() {
     { name: 'Controller rumble', key: 'rumble', kind: 'toggle' },
     { name: 'Damage numbers', key: 'numbers', kind: 'toggle' },
     { name: 'Fullscreen', kind: 'fullscreen' },
+    { group: 'Challenge', name: 'Hardcore', key: 'hardcore', kind: 'toggle', note: 'Enemies have 50% more health and hit 50% harder, elites are more common, and Anvil upgrades are off. Starts with your next run.' },
     ...(input.touch ? [] : [
       ...ACTIONS.map((a, i) => ({ group: i ? null : 'Controls', name: ACTION_NAME[a], action: a, kind: 'bind', note: i ? '' : 'Select a move, then press the new key, mouse button or controller button.' })),
       { name: 'Reset controls', kind: 'reset' },

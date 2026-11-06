@@ -5,7 +5,7 @@ const SAVE_KEY = 'dungeonlock.settings.v1';
 export const ACTIONS = ['attack', 'special', 'cast', 'dash', 'interact', 'pause'];
 
 const DEFAULTS = {
-  master: 0.8, music: 0.5, sfx: 0.8, muted: false, shake: true, rumble: true, numbers: true,
+  master: 0.8, music: 0.5, sfx: 0.8, muted: false, shake: true, rumble: true, numbers: true, hardcore: false,
   keys: { attack: ['Mouse0', 'KeyJ'], special: ['Mouse2', 'KeyK'], cast: ['KeyQ', 'KeyL'], dash: ['Space', 'ShiftLeft'], interact: ['KeyE'], pause: ['Escape'] },
   pad: { attack: 2, special: 3, cast: 1, dash: 0, interact: 5, pause: 9 },
 };

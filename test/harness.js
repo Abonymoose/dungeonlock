@@ -353,13 +353,13 @@ export async function settingsCheck() {
   const before = settings.master;
   pad.axes[0] = 1; step(0.05); pad.axes[0] = 0; step(0.05); // master volume up one notch
   check(results, 'slider moves', Math.abs(settings.master - Math.min(1, before + 0.1)) < 1e-9);
-  clickSel(8); // the Attack row
+  clickSel(9); // the Attack row
   check(results, 'rebind waits for a key', !!input.capture);
   dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF' }));
   dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyF' }));
   check(results, 'attack rebinds to F', settings.keys.attack.join() === 'KeyF');
   input.lastCapture = 0;
-  clickSel(9); // Special: take F as well, so the two swap
+  clickSel(10); // Special: take F as well, so the two swap
   dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF' }));
   dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyF' }));
   check(results, 'taking a used key swaps them', settings.keys.special.join() === 'KeyF' && settings.keys.attack.join() !== 'KeyF' && settings.keys.attack.length > 0);
@@ -517,5 +517,30 @@ export async function touchControls() {
   check(results, 'a tapped hint works as its button', W.state === 'playmenu', W.state);
   clickSel(0);
   input.touch = false; // the other tests use the pad
+  return results;
+}
+
+// Hardcore: the Anvil's help stays home, enemies are tougher, and their hits land harder
+export async function hardcore() {
+  const results = [];
+  settings.hardcore = true;
+  try {
+    await toTitle();
+    press(0);
+    await waitFor('play');
+    const p = W.player;
+    check(results, 'Anvil upgrades are off', p.maxHp === p.cls.hp && !p.lives && !W.run.keys && p.mods.atk === 1, `health ${p.maxHp}`);
+    spawnEnemy('grunt', p.pos.x + 3, p.pos.z, 0);
+    step(1);
+    const g = W.enemies.find((e) => !e.dead && e.type === 'grunt');
+    check(results, 'enemies have half again the health', g?.maxHp === Math.round(TYPES.grunt.hp * 1.5), `${g?.maxHp} vs ${TYPES.grunt.hp}`);
+    p.maxHp = p.hp = 9999;
+    const hit = (on) => { settings.hardcore = on; p.invuln = 0; const before = p.hp; damage(p, 20, g.pos, { source: g }); return before - p.hp; };
+    const normal = hit(false), hard = hit(true);
+    check(results, 'their hits land half again as hard', hard >= normal * 1.4, `${normal} vs ${hard}`);
+    p.hp = 0; p.dead = true;
+    step(3);
+    await toTitle();
+  } finally { settings.hardcore = false; }
   return results;
 }

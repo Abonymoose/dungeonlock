@@ -6,6 +6,7 @@ import { XP_FOR, xpToNext } from './run.js';
 import { updateStatus } from './boons.js';
 import { hooks, makeEntity, meleeArc, fireProjectile, aoe, telegraph, addTrail, moveEntity, tickEntity, turnToward, floatText, burst, damage, heal } from './combat.js';
 import { sfx } from './audio.js';
+import { settings } from './settings.js';
 
 const Y = new THREE.Vector3(0, 1, 0), tmp = new THREE.Vector3(), dir = new THREE.Vector3();
 
@@ -51,7 +52,7 @@ export function spawnEnemy(type, x, z, depth, elite = false) {
 
 function create(type, x, z, depth, elite = false) {
   const T = TYPES[type];
-  const e = makeEntity(T.model(), { team: 1, hp: Math.round(T.hp * (1 + depth * 0.08 + Math.max(0, depth - 10) * 0.05)), radius: T.radius, speed: T.speed * (1 + Math.min(depth, 40) * 0.008), armor: T.armor ?? 0 });
+  const e = makeEntity(T.model(), { team: 1, hp: Math.round(T.hp * (1 + depth * 0.08 + Math.max(0, depth - 10) * 0.05) * (settings.hardcore ? 1.5 : 1)), radius: T.radius, speed: T.speed * (1 + Math.min(depth, 40) * 0.008), armor: T.armor ?? 0 });
   Object.assign(e, {
     type, T, depth, state: 'recover', timer: 0.4 + Math.random() * 0.6, phase: 0, swingT: 0, walkT: 0, deadT: 0,
     knockResist: T.knockResist ?? 1, stunResist: T.stunResist ?? 1, guard: !!T.guard,
