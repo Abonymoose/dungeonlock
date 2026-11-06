@@ -165,7 +165,7 @@ export function titleScreen(classes, sel, meta, cast) {
   const w = classes[sel], go = w.owned ? 'Descend' : `Buy ${w.weapon.name} (${w.weapon.cost} ash)`;
   showScreen(`
     <h2>Choose your class</h2>
-    <div class="cards">${cards}</div>
+    <div class="cards classes">${cards}</div>
     <div class="hints"><span>${btn('confirm')}${go}</span><span>${btn('up')}${btn('down')}Weapon</span><span>${btn('alt')}The Anvil (${meta.ash} ash)</span><span>${btn('back')}Back</span></div>`);
 }
 
