@@ -70,6 +70,7 @@ export function damage(target, amount, from, { knockback = 0, stun = 0, crit = f
   if (byPlayer && hooks.dmgMult) amount *= hooks.dmgMult(target, tag);
   if (target.team === 0 && hooks.playerHurt) amount = hooks.playerHurt(source, amount);
   if (target.team === 0 && settings.hardcore) amount *= 1.5;
+  if (target.team === 0 && world.run) world.run.hurt = true;
   // a shieldbearer takes a fifth of any hit that comes from in front of it
   if (target.guard && from && guardV.subVectors(from, target.pos).setY(0).dot(target.facing) > 0.3 * guardV.length()) { amount *= 0.2; floatText(target.pos, 'BLOCK', 'status'); }
   amount = Math.max(1, Math.round(amount * (1 - target.armor)));

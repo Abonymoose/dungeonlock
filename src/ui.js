@@ -197,7 +197,7 @@ export function choiceScreen(header, cards, sel, hints) {
     </div>`).join('');
   showScreen(`
     <div class="patron" style="--c:${header.css}"><h2>${header.name.toUpperCase()}</h2><div class="tag">${header.title}</div></div>
-    <div class="cards">${html}</div>
+    <div class="cards ${cards.length > 5 ? 'many' : ''}">${html}</div>
     <div class="hints">${hints}</div>`);
 }
 
@@ -258,6 +258,15 @@ export function scrollCodex(dy) { const el = screen.querySelector('.codex'); if 
 const tut = $('#tutorial');
 // A line of story at the bottom of the screen: who speaks, what they say, and how to go on
 const talkEl = $('#talk');
+const toastEl = document.getElementById('toast');
+let toastTimer = 0;
+export function toast(html) {
+  toastEl.innerHTML = html;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 3600);
+}
+
 export function dialogue(line) {
   talkEl.classList.toggle('hidden', !line);
   if (line) set(talkEl, `${line[0] ? `<div class="who">${line[0]}</div>` : ''}<p>${line[1]}</p><div class="next">${btn('confirm')}</div>`);

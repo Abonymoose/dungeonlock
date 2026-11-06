@@ -6,15 +6,21 @@ import { settings, ACTIONS } from './settings.js';
 import { keyName, padName } from './input.js';
 import { RECIPES, costText } from './wild.js';
 import { CHAPTERS, FORGE, FORGE_MAX } from './adventure.js';
+import { FEATS, hasFeat } from './feats.js';
 
 // The encyclopedia, built from the game's own data so it can't go out of date.
 // The in-game Codex shows one section at a time; the wiki site prints them all.
-export const TABS = ['Classes', 'Enemies', 'Patrons', 'Biomes', 'Upgrades', 'Controls'];
+export const TABS = ['Classes', 'Enemies', 'Patrons', 'Biomes', 'Upgrades', 'Feats', 'Controls'];
 
 // img is a picture rendered from the game (test/shots.js); `base` is where those live for whoever shows the codex
 let base = 'assets/shots/';
 const entry = (title, body, color, img, wide = false) => `<article class="entry"${color ? ` style="--c:${color}"` : ''}>${img ? `<img class="${wide ? 'wide' : 'portrait'}" src="${base}${img}.png" alt="" loading="lazy">` : ''}<h3>${title}</h3>${body}</article>`;
 const boonLine = (b, rarity, extra = '') => `<li><b>${b.name}</b>${extra}: ${describe({ id: b.id, rarity, level: 1 })}</li>`;
+
+// mine: mark the ones this save has earned (the wiki shows the plain list)
+const feats = (mine) => entry('Feats', `<p>One-time goals in every mode. Each pays its ash the moment you earn it.</p><ul>${FEATS.map((f) =>
+  `<li><b>${mine && hasFeat(f.id) ? '&#9670; ' : ''}${f.name}</b> (${f.ash} ash): ${f.desc}</li>`).join('')}</ul>`);
+export const FEATS_WIKI = () => feats(false);
 
 // a grounded class (the swordsmith) has no special and no cast
 const classEntry = (c, img) => entry(c.name, `
@@ -61,7 +67,7 @@ const SECTIONS = [
   () => Object.entries(PATRONS).map(([id, p]) => {
     const own = Object.values(BOONS).filter((b) => b.patron === id);
     const list = own.map((b) => boonLine(b, b.legendary ? 'legendary' : 'common', b.slot ? ` (${b.slot})` : b.legendary ? ' (legendary)' : '')).join('');
-    return entry(`${p.name}, ${p.title}`, `<p>Inflicts ${p.status}. Numbers shown are for a Common boon at level 1.</p><ul>${list}</ul>`, p.css);
+    return entry(`${p.name}, ${p.title}`, `<p>Inflicts ${p.status}. ${p.about} Numbers shown are for a Common boon at level 1.</p><ul>${list}</ul>`, p.css);
   }).join('')
     + entry('Duo boons', `<p>Offered once you carry boons from both patrons.</p><ul>${Object.values(BOONS).filter((b) => b.duo)
       .map((b) => boonLine(b, 'duo', ` (${b.duo.map((d) => PATRONS[d].name).join(' and ')})`)).join('')}</ul>`)
@@ -72,6 +78,8 @@ const SECTIONS = [
   () => entry('The Anvil', `<p>Spend ash between runs, at the Anvil in the Keep. These last forever.</p><ul>${UPGRADES.map((u) => `<li><b>${u.name}</b>: ${u.desc} (up to ${u.max})</li>`).join('')}</ul>`)
     + entry('Level-up perks', `<p>Kills give XP. Each level lets you pick one of three perks once the room is clear.</p><ul>${PERKS.map((k) => `<li><b>${k.name}</b>: ${k.desc}</li>`).join('')}</ul>`)
     + HARDCORE(),
+
+  () => feats(true),
 
   () => entry('Moves', `<p>Change these in Settings.</p><dl>${ACTIONS.map((a) => `<dt>${a[0].toUpperCase() + a.slice(1)}</dt><dd>${settings.keys[a].map(keyName).join(' or ')}, or ${padName(settings.pad[a])} on a controller</dd>`).join('')}</dl>`)
     + entry('Moving and menus', '<p>Move with WASD, the arrow keys or the left stick. Aim with the mouse or the right stick. In menus, Enter or A selects, Esc or B goes back, and Tab or Y opens extras.</p>')
@@ -116,4 +124,4 @@ export const MODES = [
 ];
 // the wiki renders a part with its own picture folder
 export const wikiPart = (part, imgBase) => { base = imgBase; return part(); };
-export const CONTROLS = SECTIONS[5];
+export const CONTROLS = SECTIONS[6];

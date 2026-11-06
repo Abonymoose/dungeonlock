@@ -21,6 +21,7 @@ import { CHAPTERS, ENDING, FORGE, chapterPlan, adventureUpdate, canForge, forgeC
 import { makePrincess } from './models.js';
 import { updateTouch } from './touch.js';
 import { keepPlan, furnishKeep, keepUpdate } from './keep.js';
+import { earn } from './feats.js';
 
 const CLASS_IDS = Object.keys(CLASSES);
 let hadPad = false;
@@ -95,6 +96,8 @@ async function enterRoom(plan) {
   const room = world.room = plan.kind === 'wild' || plan.kind === 'field' ? buildWild(plan) : buildRoom(plan, plan.doorPlans ?? rollDoors(plan.depth, world.run));
   if (plan.kind === 'wild' || plan.kind === 'field') playTrack(plan.kind === 'wild' ? 'wilds' : 'adventure');
   if (plan.kind === 'keep') furnishKeep(room);
+  world.run.hurt = false;
+  dungeonFeats(false);
   const p = world.player;
   // enter from the bottom corner of the screen, facing up into the room
   p.pos.copy(room.entry);
@@ -129,7 +132,7 @@ function endRun(kind) {
   const run = world.run, ash = Math.round((run.ash + (kind === 'escaped' ? 60 : 0)) * (1 + 0.15 * meta.greed));
   meta.ash += ash;
   meta.runs++;
-  if (kind === 'escaped') meta.escapes++;
+  if (kind === 'escaped') { meta.escapes++; earn('escape'); }
   const wild = world.room?.plan.kind === 'wild';
   // what Maren will hear about in the Keep
   if (!wild) meta.lastRun = { kind, depth: run.depth, boss: world.room?.plan.kind === 'boss' ? world.room.plan.waves[0]?.[0] : null, record: run.depth > meta.bestDepth, hardcore: !!settings.hardcore };
@@ -169,6 +172,7 @@ function spawnWave() {
 function clearRoom() {
   const room = world.room, kind = room.plan.kind;
   room.cleared = true;
+  dungeonFeats(true);
   world.slowmo = 0.8; // the last kill lands in slow motion
   ui.showBanner(kind === 'boss' ? TYPES[room.plan.waves[0][0]].name.toUpperCase() + ' FALLS' : 'CLEARED', '', 1400);
   rumble(0.3, 0.3, 120);
@@ -183,6 +187,21 @@ function clearRoom() {
   else room.openDoors();
 }
 
+// Feats a Dungeon room can earn: on entering it (depth) or on clearing it (the fight itself)
+function dungeonFeats(cleared) {
+  const room = world.room, run = world.run, depth = room.plan.depth;
+  if (world.adventure || world.tutorial || run.keep || room.plan.kind === 'wild') return;
+  if (depth >= 10) earn('depth10');
+  if (depth >= 11) earn('vaults');
+  if (depth >= 20) earn('depth20');
+  if (depth >= 5 && settings.hardcore) earn('hardcore');
+  if (world.player.boons.length >= 6) earn('collector');
+  if (!cleared) return;
+  if (room.plan.waves.length) earn('firstblood');
+  if (depth >= 5 && room.plan.waves.length && !run.hurt) earn('untouched');
+  if (room.plan.kind === 'boss') earn(room.plan.waves[0][0]); // warden, prior, reaver, drownedking
+}
+
 function collect(k) {
   const p = world.player, run = world.run, type = k.type;
   sfx('pickup');
@@ -193,7 +212,7 @@ function collect(k) {
     const n = type === 'bigash' ? 40 : 10 + run.depth * 2;
     run.ash += n;
     floatText(p.pos, `+${n} ash`, 'ash');
-  } else if (type === 'boon') return openBoon(k.patron ?? Object.keys(PATRONS)[Math.floor(Math.random() * 4)]);
+  } else if (type === 'boon') return openBoon(k.patron ?? Object.keys(PATRONS)[Math.floor(Math.random() * Object.keys(PATRONS).length)]);
   else if (type === 'pom') return openKeystone();
   world.room.openDoors();
 }
@@ -315,8 +334,9 @@ function roomLogic(dt) {
     const w = wildUpdate(dt);
     wildPrompt = w.prompt;
     if (w.dawn) {
+      if (run.wild.nights >= 5) earn('nights');
       ui.showBanner('DAWN', `You lived through night ${run.wild.nights}. Take a gift.`, 1800);
-      return openBoon(Object.keys(PATRONS)[Math.floor(Math.random() * 4)]);
+      return openBoon(Object.keys(PATRONS)[Math.floor(Math.random() * Object.keys(PATRONS).length)]);
     }
     if (pressed('craft')) return openCraft();
   }
@@ -395,10 +415,11 @@ function heroes(on) {
   extras = [];
   if (!on || !world.player) return;
   world.player.model.root.rotation.y = Math.PI / 4;
+  const spots = [[-1.3, 0.7, 0.5], [1.3, 0.7, -0.5], [0, 1.5, 0]]; // across, back, turn
   CLASS_IDS.filter((_, i) => i !== menu.cls).forEach((id, k) => {
-    const m = CLASSES[id].model(equipped(id, meta));
-    m.root.position.copy(world.player.pos).addScaledVector(GROUND_RIGHT, k ? 1.3 : -1.3).addScaledVector(GROUND_UP, 0.7);
-    m.root.rotation.y = Math.PI / 4 + (k ? -0.5 : 0.5);
+    const m = CLASSES[id].model(equipped(id, meta)), [x, z, turn] = spots[k % spots.length];
+    m.root.position.copy(world.player.pos).addScaledVector(GROUND_RIGHT, x).addScaledVector(GROUND_UP, z);
+    m.root.rotation.y = Math.PI / 4 + turn;
     m.anim.loop('idle');
     m.anim.update(Math.random());
     scene.add(m.root);
@@ -571,6 +592,7 @@ function rescue() {
   room.extras = [princess];
   setTimeout(() => talk(ENDING, () => {
     meta.adventureDone = true;
+    earn('story');
     meta.adventure = null;
     saveMeta();
     disposeObject(princess.root);
@@ -676,6 +698,7 @@ const STATES = {
     if (meta.ash < w.cost) { sfx('menu'); world.shake = 0.1; return; }
     meta.ash -= w.cost;
     meta.owned = [...(meta.owned ?? []), w.id];
+    if (Object.values(WEAPONS).flat().every((x) => owns(meta, x))) earn('armory');
     meta.gear = { ...meta.gear, [id]: w.id };
     saveMeta();
     sfx('unlock');

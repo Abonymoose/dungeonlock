@@ -5,7 +5,7 @@ import { scene, toon, basic, torchLights, setMood } from './render.js';
 import { makeIcon, disposeObject } from './models.js';
 import { PATRONS } from './boons.js';
 import { spawnEnemy } from './enemies.js';
-import { burst, floatText, heal } from './combat.js';
+import { burst, floatText, heal, damage } from './combat.js';
 import { sfx } from './audio.js';
 import { btn, pressed } from './input.js';
 import { haloMat } from './room.js';
@@ -144,7 +144,7 @@ export function buildWild(plan) {
   }
 
   const room = {
-    plan, group, obstacles, nodes, pickups: [], doors: [], traps: [], fires: [], lightSpots: [], fountain: null, cleared: true, waveIndex: 0, lightT: 0,
+    plan, group, obstacles, nodes, pickups: [], doors: [], traps: [], fires: [], spikes: [], lightSpots: [], fountain: null, cleared: true, waveIndex: 0, lightT: 0,
     entry: new THREE.Vector3(plan.entry[0], 0, plan.entry[1]), center: new THREE.Vector3(plan.center[0], 0, plan.center[1]),
     bounds: { x0: 0, x1: SIZE, z0: 0, z1: SIZE },
   };
@@ -227,6 +227,29 @@ export function buildWild(plan) {
       room.lightSpots.push({ x, y: 1.2, z, color: 0xff9a50, base: 22 });
       addObs({ x, z, hw: 0.3, hd: 0.3 });
       room.lightT = 0;
+    } else if (kind === 'spikes') {
+      // eight stakes in a ring, low enough to walk over
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2, stake = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.38, 4).translate(0, 0.19, 0), toon(0x8a6a4a));
+        stake.position.set(Math.cos(a) * 0.45, 0, Math.sin(a) * 0.45);
+        stake.rotation.set(Math.sin(a) * 0.35, 0, -Math.cos(a) * 0.35);
+        stake.castShadow = true;
+        b.add(stake);
+      }
+      room.spikes.push({ x, z, t: 0 });
+    } else if (kind === 'torch') {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.3, 5).translate(0, 0.65, 0), toon(0x5a3a26));
+      post.castShadow = true;
+      const flame = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.34, 5).translate(0, 0.17, 0), basic(0xffb060));
+      flame.position.y = 1.3;
+      const halo = new THREE.Sprite(haloMat(0xffb060));
+      halo.position.y = 1.45;
+      halo.scale.setScalar(1.6);
+      b.add(post, flame, halo);
+      room.fires.push({ x, z, flame, halo, torch: true });
+      room.lightSpots.push({ x, y: 1.7, z, color: 0xffb060, base: 14 });
+      addObs({ x, z, hw: 0.15, hd: 0.15 });
+      room.lightT = 0;
     } else {
       const wall = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.9, 0.3).translate(0, 0.45, 0), toon(0x7a5434));
       wall.castShadow = wall.receiveShadow = true;
@@ -245,7 +268,7 @@ export function buildWild(plan) {
     for (const [i, f] of room.fires.entries()) {
       const k = Math.sin(world.time * 11 + i * 2.3) * Math.sin(world.time * 7.3 + i);
       f.flame.scale.set(1, 1 + 0.25 * k, 1);
-      f.halo.scale.setScalar(2.3 + 0.25 * k);
+      f.halo.scale.setScalar((f.torch ? 1.5 : 2.3) + 0.25 * k);
     }
     // the fixed pool of lights goes to the campfires nearest the player
     if ((room.lightT -= dt) <= 0 && world.player) {
@@ -336,7 +359,16 @@ export function wildUpdate(dt) {
     }
   }
   // resting by a fire heals
-  if (room.fires.some((f) => Math.hypot(f.x - p.pos.x, f.z - p.pos.z) < 3.2)) p.hp = Math.min(p.maxHp, p.hp + 4 * dt);
+  if (room.fires.some((f) => !f.torch && Math.hypot(f.x - p.pos.x, f.z - p.pos.z) < 3.2)) p.hp = Math.min(p.maxHp, p.hp + 4 * dt);
+  // spike traps cut whatever dead stand on them, twice a second
+  for (const s of room.spikes) {
+    if ((s.t -= dt) > 0) continue;
+    for (const e of world.enemies) {
+      if (e.dead || Math.hypot(e.pos.x - s.x, e.pos.z - s.z) > 0.8) continue;
+      damage(e, 10 + w.nights * 3, e.pos.clone().set(s.x, 0, s.z), { knockback: 1 });
+      s.t = 0.5;
+    }
+  }
 
   const m = w.mats;
   run.label = `${night ? 'NIGHT ' + w.nights : 'DAY ' + (w.nights + 1)}<br>${m.wood} WOOD &nbsp;${m.stone} STONE &nbsp;${m.fiber} FIBER`;
@@ -367,6 +399,10 @@ export const RECIPES = [
   { id: 'wall', name: 'Barricade', desc: 'A wall of stakes in front of you. Zombies have to go round it.', cost: { wood: 4 } },
   { id: 'bandage', name: 'Bandage', desc: 'Heal 35% of your health.', cost: { fiber: 3 } },
   { id: 'whet', name: 'Whetstone', desc: '+10% damage with everything.', cost: { stone: 4, wood: 2 } },
+  { id: 'spikes', name: 'Spike Trap', desc: 'A ring of sharpened stakes on the ground. The dead that walk over it are cut.', cost: { wood: 3, stone: 2 } },
+  { id: 'torch', name: 'Torch Post', desc: 'Lights the ground around it, and nothing rises near it. It does not heal you.', cost: { wood: 2, fiber: 1 } },
+  { id: 'stew', name: 'Hearty Stew', desc: '+15 max health for the rest of the run, and heal 15.', cost: { fiber: 2, wood: 1 } },
+  { id: 'charm', name: 'Lucky Charm', desc: '+1 Cast shard.', cost: { stone: 2, fiber: 2 } },
 ];
 export const canCraft = (r) => Object.entries(r.cost).every(([k, v]) => world.run.wild.mats[k] >= v);
 export const costText = (r) => Object.entries(r.cost).map(([k, v]) => `${v} ${k}`).join(', ');
@@ -375,9 +411,11 @@ export function craft(r) {
   for (const [k, v] of Object.entries(r.cost)) w.mats[k] -= v;
   let front = p.pos.clone().addScaledVector(p.facing, 1.4);
   if (!room.onFloor(front)) front = p.pos.clone();
-  if (r.id === 'fire') room.build('fire', front.x, front.z);
+  if (r.id === 'fire' || r.id === 'spikes' || r.id === 'torch') room.build(r.id, front.x, front.z);
   else if (r.id === 'wall') room.build('wall', front.x, front.z, Math.atan2(p.facing.x, p.facing.z));
   else if (r.id === 'bandage') heal(p, p.maxHp * 0.35);
+  else if (r.id === 'stew') { p.maxHp += 15; heal(p, 15); }
+  else if (r.id === 'charm') { p.maxAmmo++; p.ammo++; }
   else { p.mods.atk *= 1.1; p.mods.spc *= 1.1; p.mods.cast *= 1.1; }
   ui.showBanner(r.name.toUpperCase(), r.id === 'whet' ? 'Your weapons bite deeper.' : '', 1200);
   sfx('unlock');

@@ -3,8 +3,8 @@ import { C } from './config.js';
 import { world } from './world.js';
 import { input, pressed, isHeld, rumble } from './input.js';
 import { GROUND_RIGHT, GROUND_UP, basic, flashLight, screenToGround } from './render.js';
-import { makeKnight, makeRogue, makeWizard, makeSmith } from './models.js';
-import { hooks, makeEntity, meleeArc, fireProjectile, aoe, spawnGhost, addTrail, moveEntity, tickEntity, turnToward, opponents, damage } from './combat.js';
+import { makeKnight, makeRogue, makeWizard, makeBarbarian, makeSmith } from './models.js';
+import { hooks, makeEntity, meleeArc, fireProjectile, aoe, spawnGhost, addTrail, moveEntity, tickEntity, turnToward, opponents, damage, heal } from './combat.js';
 import { sfx } from './audio.js';
 
 const Y = new THREE.Vector3(0, 1, 0), tmp = new THREE.Vector3(), aimDir = new THREE.Vector3(), move = new THREE.Vector3();
@@ -60,7 +60,24 @@ export const CLASSES = {
     dash: { name: 'Blink', blink: 3.4, cd: 1.0, charges: 1 },
     passive: 'Blink teleports through danger', ranged: true,
   },
+  barbarian: {
+    name: 'Barbarian', blurb: 'Huge, tough and angry. The more he bleeds, the harder he hits.',
+    hp: 140, speed: 4.6, armor: 0.1, model: makeBarbarian, swingAxis: 'y',
+    attack: {
+      name: 'Chop', cd: 0.55, desc: 'Heavy two-handed chops; every third spins all the way round',
+      use: (p, f) => meleeArc(p, { range: f.fin ? 2.4 : 2.2, arc: f.fin ? Math.PI * 2 : 2.4, damage: 24 * p.mods.atk * f.mult * rage(p), knockback: f.fin ? 11 : 7, heavy: f.fin, tag: 'attack' }),
+    },
+    special: {
+      name: 'War Cry', cd: 2.6, desc: 'A roar that stuns everything near you and heals you a little',
+      use: (p) => { aoe(p, { pos: p.pos, radius: 3.4, damage: 8 * p.mods.spc * rage(p), knockback: 6, stun: 1.0, color: C.SAND, tag: 'special' }); heal(p, p.maxHp * 0.06); world.shake = 0.2; },
+    },
+    dash: { name: 'Leap', speed: 12, time: 0.2, cd: 0.7, charges: 1 },
+    passive: 'Rage: up to 50% more damage as his health runs low',
+  },
 };
+
+// the Barbarian's passive: 1 at full health, 1.5 at none
+const rage = (p) => 1 + 0.5 * (1 - Math.max(0, p.hp) / p.maxHp);
 
 // Three weapons per class. The first is the class as it comes; the others cost ash once, on class select.
 // A weapon brings its own Attack and Special (and what the hero holds); health, dash and passive stay the class's.
@@ -125,6 +142,35 @@ export const WEAPONS = {
       special: {
         name: 'Smoke Bomb', cd: 1.8, desc: 'Stun everything around you, and you cannot be hit for a moment',
         use: (p) => { aoe(p, { pos: p.pos, radius: 2.4, damage: 6 * p.mods.spc, stun: 1.2, color: C.OAK, tag: 'special' }); p.invuln = Math.max(p.invuln, 0.6); },
+      },
+    },
+  ],
+  barbarian: [
+    { id: 'greataxe', name: 'Greataxe', desc: 'Heavy chops that spin on every third, and a war cry that stuns.' },
+    {
+      id: 'twinaxes', name: 'Twin Axes', cost: 150, desc: 'An axe in each hand. Fast hacking, and two thrown axes that cut through a crowd.',
+      hide: ['2H_Axe', 'Barbarian_Round_Shield', 'Mug'],
+      anims: { attack: 'Dualwield_Melee_Attack_Chop', attack2: 'Dualwield_Melee_Attack_Slice', special: 'Throw' },
+      attack: {
+        name: 'Hack', cd: 0.28, desc: 'Fast two-handed hacking',
+        use: (p, f) => meleeArc(p, { range: 1.8, arc: 2.0, damage: 11 * p.mods.atk * f.mult * rage(p), knockback: f.fin ? 7 : 3, heavy: f.fin, tag: 'attack' }),
+      },
+      special: {
+        name: 'Axe Throw', cd: 1.2, desc: 'Throw both axes; they go through everything',
+        use: (p) => { for (const a of [-0.12, 0.12]) fireProjectile({ owner: p, dir: aimDir.copy(p.facing).applyAxisAngle(Y, a), speed: 15, damage: 18 * p.mods.spc * rage(p), range: 10, size: 0.22, pierce: true, color: C.SAND, tag: 'special' }); },
+      },
+    },
+    {
+      id: 'axeshield', name: 'Axe and Shield', cost: 200, desc: 'A hand axe and a round shield. Solid cuts, and a shield bash that bowls foes over.',
+      hide: ['2H_Axe', '1H_Axe_Offhand', 'Mug'],
+      anims: { attack: '1H_Melee_Attack_Chop', attack2: '1H_Melee_Attack_Slice_Diagonal', special: 'Block_Attack' },
+      attack: {
+        name: 'Cleave', cd: 0.4, desc: 'Steady one-handed cuts',
+        use: (p, f) => meleeArc(p, { range: 1.9, arc: 2.4, damage: 17 * p.mods.atk * f.mult * rage(p), knockback: f.fin ? 9 : 5, heavy: f.fin, tag: 'attack' }),
+      },
+      special: {
+        name: 'Shield Bash', cd: 1.4, desc: 'Charge behind the shield and stun what you hit',
+        use: (p) => { p.charge = { t: 0.32, hit: new Set() }; p.invuln = Math.max(p.invuln, 0.34); addTrail(() => (p.charge ? p.pos.clone().setY(0.45) : undefined), C.SAND, 0.9); },
       },
     },
   ],

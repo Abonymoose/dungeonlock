@@ -25,6 +25,13 @@ export const makeRogue = (w = {}) => character('Rogue_Hooded', {
   anims: { ...HERO, attack: 'Dualwield_Melee_Attack_Stab', attack2: 'Dualwield_Melee_Attack_Slice', special: 'Throw', ...w.anims },
 });
 
+// the Barbarian keeps his bear hat and cape (the Adventure smith is the same model without them)
+export const makeBarbarian = (w = {}) => character('Barbarian', {
+  tint: [C.ONYX, 0x6a3a2a, C.OAK, 0.55],
+  hide: w.hide ?? ['1H_Axe', '1H_Axe_Offhand', 'Barbarian_Round_Shield', 'Mug'],
+  anims: { ...HERO, attack: '2H_Melee_Attack_Chop', attack2: '2H_Melee_Attack_Spin', special: 'Cheer', dash: 'Jump_Full_Short', ...w.anims },
+});
+
 export const makeWizard = (w = {}) => character('Mage', {
   tint: WIZARD_TINT,
   hide: w.hide ?? ['Spellbook', 'Spellbook_open', '1H_Wand'],

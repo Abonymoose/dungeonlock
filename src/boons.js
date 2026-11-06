@@ -2,11 +2,13 @@ import { world } from './world.js';
 import { hooks, damage, aoe, floatText, burst, heal, opponents } from './combat.js';
 
 // ---- patrons: the old keepers of the dungeon, each with one status effect ----
+// about: what the status does, for the codex
 export const PATRONS = {
-  cinder: { name: 'Cinder', title: 'the Burning Warden', color: 0xe07a3a, css: '#E07A3A', status: 'Burn' },
-  rime: { name: 'Rime', title: 'the Frozen Gaoler', color: 0x9fc0d6, css: '#9FC0D6', status: 'Chill' },
-  verdigris: { name: 'Verdigris', title: 'the Rusted Keeper', color: 0x7fa37a, css: '#7FA37A', status: 'Corrode' },
-  hush: { name: 'Hush', title: 'the Silent Turnkey', color: 0xb49ad0, css: '#B49AD0', status: 'Hex' },
+  cinder: { name: 'Cinder', title: 'the Burning Warden', color: 0xe07a3a, css: '#E07A3A', status: 'Burn', about: 'Burn deals damage over time, and stacks.' },
+  rime: { name: 'Rime', title: 'the Frozen Gaoler', color: 0x9fc0d6, css: '#9FC0D6', status: 'Chill', about: 'Chill slows; at 60% the foe freezes solid for a moment.' },
+  verdigris: { name: 'Verdigris', title: 'the Rusted Keeper', color: 0x7fa37a, css: '#7FA37A', status: 'Corrode', about: 'Corrode makes a foe take more damage from everything.' },
+  hush: { name: 'Hush', title: 'the Silent Turnkey', color: 0xb49ad0, css: '#B49AD0', status: 'Hex', about: 'A hexed foe bursts when it dies, hurting everything near it.' },
+  gale: { name: 'Gale', title: 'the Howling Warder', color: 0xe8d25a, css: '#E8D25A', status: 'Shock', about: 'Shock jumps from the foe you hit to the nearest other foe, dealing that much damage.' },
 };
 
 export const RARITY = [
@@ -27,22 +29,23 @@ const APPLY = {
   rime: (t, v) => addStatus(t, 'chill', v),      // v% slow; 60% freezes
   verdigris: (t, v) => addStatus(t, 'corrode', v), // v% more damage taken
   hush: (t, v) => addStatus(t, 'hex', v),        // explodes for v when it dies
+  gale: (t, v) => shock(t, v),                    // v damage to the nearest other foe, at once
 };
-const BASE = { cinder: 3, rime: 12, verdigris: 6, hush: 25 };
+const BASE = { cinder: 3, rime: 12, verdigris: 6, hush: 25, gale: 6 };
 // Damage on slot boons is the same for every patron; only the status differs. `k` is the boon's rarity x level multiplier.
 const SPECIAL_BONUS = 25, CAST_BURST = 18, DASH_BURST = 10;
 const kOf = (pid, v) => v / BASE[pid];
-const UNIT = { cinder: ' Burn', rime: '% Chill', verdigris: '% Corrode', hush: ' Hex' };
+const UNIT = { cinder: ' Burn', rime: '% Chill', verdigris: '% Corrode', hush: ' Hex', gale: ' Shock' };
 
 // 4 slot boons per patron, generated from the same shape so every patron covers every move
 const SLOT_BOONS = Object.keys(PATRONS).flatMap((pid) => [
-  { slot: 'attack', name: { cinder: 'Searing Strike', rime: 'Frostbite Strike', verdigris: 'Rusted Strike', hush: 'Hushed Strike' }[pid],
+  { slot: 'attack', name: { cinder: 'Searing Strike', rime: 'Frostbite Strike', verdigris: 'Rusted Strike', hush: 'Hushed Strike', gale: 'Static Strike' }[pid],
     desc: (v) => `Your Attack inflicts ${v}${UNIT[pid]}.`, base: BASE[pid] },
-  { slot: 'special', name: { cinder: 'Blazing Flourish', rime: 'Glacial Flourish', verdigris: 'Corroding Flourish', hush: 'Silent Flourish' }[pid],
+  { slot: 'special', name: { cinder: 'Blazing Flourish', rime: 'Glacial Flourish', verdigris: 'Corroding Flourish', hush: 'Silent Flourish', gale: 'Thunder Flourish' }[pid],
     desc: (v) => `Your Special deals +${Math.round(SPECIAL_BONUS * kOf(pid, v))}% damage and inflicts ${v * 2}${UNIT[pid]}.`, base: BASE[pid] },
-  { slot: 'cast', name: { cinder: 'Flare Shard', rime: 'Rime Shard', verdigris: 'Acid Shard', hush: 'Grave Shard' }[pid],
+  { slot: 'cast', name: { cinder: 'Flare Shard', rime: 'Rime Shard', verdigris: 'Acid Shard', hush: 'Grave Shard', gale: 'Storm Shard' }[pid],
     desc: (v) => `Your Cast bursts on impact for ${Math.round(CAST_BURST * kOf(pid, v))} damage and inflicts ${v * 2}${UNIT[pid]}.`, base: BASE[pid] },
-  { slot: 'dash', name: { cinder: 'Ember Step', rime: 'Frost Step', verdigris: 'Rust Step', hush: 'Shade Step' }[pid],
+  { slot: 'dash', name: { cinder: 'Ember Step', rime: 'Frost Step', verdigris: 'Rust Step', hush: 'Shade Step', gale: 'Spark Step' }[pid],
     desc: (v) => `Your Dash leaves a burst that deals ${Math.round(DASH_BURST * kOf(pid, v))} damage and inflicts ${v}${UNIT[pid]}.`, base: BASE[pid] },
 ].map((b) => ({ ...b, id: `${pid}_${b.slot}`, patron: pid })));
 
@@ -60,6 +63,13 @@ const OTHER_BOONS = [
   { id: 'shatter', patron: 'rime', name: 'Shatter', legendary: true, base: 40, desc: (v) => `When a foe freezes, it shatters the ice around it for ${v} damage.` },
   { id: 'ruin', patron: 'verdigris', name: 'Ruin', legendary: true, base: 1, desc: () => 'Corrode can stack twice as high.' },
   { id: 'requiem', patron: 'hush', name: 'Requiem', legendary: true, base: 1, desc: () => 'Hex blasts hex every foe they hit.' },
+  { id: 'tailwind', patron: 'gale', name: 'Tailwind', base: 10, desc: (v) => `Move ${v}% faster.`, onTake: (p, v) => { p.mods.speed *= 1 + v / 100; } },
+  { id: 'conductor', patron: 'gale', name: 'Conductor', base: 1, desc: (v) => `Shock jumps to ${Math.round(v)} more foe${Math.round(v) > 1 ? 's' : ''}.` },
+  { id: 'stormcall', patron: 'gale', name: 'Stormcall', legendary: true, base: 40, desc: (v) => `Every fifth Shock calls down a bolt on the foe you hit, for ${v} damage.` },
+  { id: 'firestorm', duo: ['cinder', 'gale'], name: 'Firestorm', base: 3, desc: (v) => `Shock also inflicts ${v} Burn on every foe it jumps to.` },
+  { id: 'hailstorm', duo: ['rime', 'gale'], name: 'Hailstorm', base: 15, desc: (v) => `Shock also inflicts ${v}% Chill on every foe it jumps to.` },
+  { id: 'galvanize', duo: ['verdigris', 'gale'], name: 'Galvanize', base: 40, desc: (v) => `Shock deals +${v}% damage to corroded foes.` },
+  { id: 'thunderhex', duo: ['hush', 'gale'], name: 'Thunderhex', base: 8, desc: (v) => `Hex blasts set off a ${v} Shock from every foe they hit.` },
   { id: 'steamvent', duo: ['cinder', 'rime'], name: 'Steam Vent', base: 50, desc: (v) => `Foes that are both burning and chilled take +${v}% damage.` },
   { id: 'moltenrust', duo: ['cinder', 'verdigris'], name: 'Molten Rust', base: 2, desc: (v) => `Each Burn tick also adds ${v}% Corrode.` },
   { id: 'pyrerite', duo: ['cinder', 'hush'], name: 'Pyre Rite', base: 6, desc: (v) => `Hex blasts inflict ${v} Burn.` },
@@ -126,7 +136,33 @@ export function slotIcons(p) {
 
 // ---- status effects on enemies ----
 
-const STATUS_TINT = { burn: 0xe07a3a, chill: 0x9fc0d6, corrode: 0x7fa37a, hex: 0xb49ad0 };
+const STATUS_TINT = { burn: 0xe07a3a, chill: 0x9fc0d6, corrode: 0x7fa37a, hex: 0xb49ad0, shock: 0xe8d25a };
+
+// Gale's Shock is instant, not a lingering status: lightning leaps from the foe you hit to the nearest other one
+function shock(t, val) {
+  const p = world.player, jumps = 1 + Math.round(v(p, 'conductor'));
+  const hit = new Set([t]);
+  let from = t;
+  for (let i = 0; i < jumps; i++) {
+    let next = null, best = 4;
+    for (const o of opponents(0)) {
+      if (hit.has(o)) continue;
+      const d = o.pos.distanceTo(from.pos);
+      if (d < best) { best = d; next = o; }
+    }
+    if (!next) break;
+    hit.add(next);
+    burst(from.pos, STATUS_TINT.shock, 3);
+    burst(next.pos, STATUS_TINT.shock, 5);
+    damage(next, val * (next.status?.corrode ? 1 + v(p, 'galvanize') / 100 : 1), from.pos, { tag: 'status', quiet: true, color: 'shock' });
+    if (has(p, 'firestorm')) addStatus(next, 'burn', v(p, 'firestorm'));
+    if (has(p, 'hailstorm')) addStatus(next, 'chill', v(p, 'hailstorm'));
+    from = next;
+  }
+  if (has(p, 'stormcall') && (p.shocks = (p.shocks ?? 0) + 1) % 5 === 0 && !t.dead) {
+    aoe(p, { pos: t.pos.clone(), radius: 1.6, damage: v(p, 'stormcall'), knockback: 4, tag: 'status', color: STATUS_TINT.shock });
+  }
+}
 
 function addStatus(t, kind, amount) {
   if (t.dead || t.team !== 1) return;
@@ -240,6 +276,7 @@ hooks.onKill = (e) => {
       onEach: (t) => {
         if (has(p, 'requiem')) addStatus(t, 'hex', s.hex.v);
         if (has(p, 'pyrerite')) addStatus(t, 'burn', v(p, 'pyrerite'));
+        if (has(p, 'thunderhex')) shock(t, v(p, 'thunderhex'));
       },
     });
   }

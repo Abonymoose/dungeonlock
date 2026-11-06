@@ -58,6 +58,7 @@
   .card.boon .kind { font-size: 0.6em; color: var(--c); margin-bottom: 0.8em; letter-spacing: 0.1em; }
   .card.boon .rar { font-size: 0.6em; color: var(--r); margin-bottom: 0.8em; }
   .ftext.burn { color: #E07A3A; font-size: 0.8em; }
+  .ftext.shock { color: #E8D25A; font-size: 0.8em; }
   .ftext.status { color: var(--sand); font-size: 0.8em; }
   .pip { display: block; width: calc(var(--u) * 5); height: calc(var(--u) * 8); background: var(--choc); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
   .pip.full { background: var(--sand); }
@@ -242,6 +243,17 @@
   #tutorial p { margin: 0.6em 0 0.8em; font-size: 0.8em; line-height: 1.8; }
   #tutorial .bar { height: calc(var(--u) * 2); background: var(--onyx); box-shadow: 0 0 0 var(--u) var(--choc); }
   #tutorial .bar i { display: block; height: 100%; background: var(--sand); transition: width 0.2s; }
+  /* feat pop-up: slides in at the right, under the resources */
+  #toast {
+    position: fixed; right: calc(var(--u) * 10); top: calc(var(--u) * 34); z-index: 4; pointer-events: none; max-width: min(70vw, calc(var(--u) * 120));
+    display: flex; flex-direction: column; gap: 0.4em; font-size: 0.75em; border-color: var(--sand);
+    opacity: 0; transform: translateX(calc(var(--u) * 8)); transition: opacity 0.3s, transform 0.3s;
+  }
+  #toast.show { opacity: 1; transform: none; }
+  #toast b { font-weight: normal; color: var(--sand); }
+  #toast span { color: var(--oak); font-size: 0.85em; line-height: 1.6; }
+  #toast .ash { color: var(--sand); }
+  @media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
   /* ---- phones ---- */
   /* touch controls: a stick that appears under your left thumb, and diamond buttons like the HUD's pips */
   #touch { position: fixed; inset: 0; z-index: 3; pointer-events: none; font-size: 9px; }
@@ -292,6 +304,8 @@
     .pcards, .cards { gap: calc(var(--u) * 4); flex-wrap: nowrap; width: 100%; }
     .pcard, .card { flex: 1 1 0; min-width: 0; max-width: calc(var(--u) * 70); }
     #screen { justify-content: safe center; overflow-y: auto; touch-action: pan-y; }
+    .cards.many { flex-wrap: wrap; }
+    .cards.many .card { flex: 0 1 calc(var(--u) * 60); }
     .pcard p, .card p { font-size: 0.7em; }
     .pcard .art { aspect-ratio: 5 / 2; }
     .card { min-height: 0; }
@@ -325,6 +339,7 @@
 <div id="banner"><h1></h1><p></p></div>
 <div id="tutorial" class="hidden"></div>
 <div id="talk" class="hidden" data-act="confirm"></div>
+<div id="toast" class="panel"></div>
 <div id="screen" class="hidden"></div>
 <div id="fade"></div>
 <div id="rotate"><div class="phone"></div><p>Turn your phone sideways to play.</p></div>

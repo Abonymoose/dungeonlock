@@ -135,7 +135,7 @@ export async function smoke() {
   const badRooms = plans();
   check(results, 'generated rooms are all reachable', !badRooms.length, badRooms.slice(0, 3).join(', '));
   await toTitle();
-  for (const id of ['knight', 'rogue', 'wizard']) {
+  for (const id of ['knight', 'rogue', 'wizard', 'barbarian']) {
     await toTitle();
     press(0);
     check(results, `${id}: run starts`, await waitFor('play'), W.room?.plan.kind);
@@ -595,5 +595,92 @@ export async function keep() {
   step(3);
   press(0);
   check(results, 'a finished run comes back to the Keep, with news', await go(() => W.state === 'play' && W.room?.plan.kind === 'keep') && meta.keepNews === true && meta.lastRun?.depth === 0, W.state);
+  return results;
+}
+
+// Feats: clearing a fight earns First Blood once, pays its ash into the bank, and pops up
+export async function feats() {
+  const results = [];
+  const F = await import('../src/feats.js');
+  meta.feats = {};
+  await toTitle();
+  press(0);
+  await waitFor('play');
+  W.player.maxHp = W.player.hp = 99999;
+  const ash = meta.ash, d = W.room.doors[0];
+  Object.assign(d, { kind: 'combat', reward: 'ash', locked: false });
+  W.room.openDoors();
+  d.open = true;
+  await goDoor(d);
+  for (let i = 0; i < 30 && !W.room.cleared; i++) { for (const e of W.enemies.filter((x) => !x.dead)) damage(e, 1e6, e.pos); step(0.5); }
+  check(results, 'clearing a fight earns First Blood and pays its ash', F.hasFeat('firstblood') && meta.ash === ash + 20, `${meta.ash - ash} ash`);
+  check(results, 'the feat pops up', /FIRST BLOOD/.test(document.getElementById('toast').textContent));
+  const banked = meta.ash;
+  check(results, 'a feat pays only once', F.earn('firstblood') === false && meta.ash === banked);
+  W.player.hp = 0; W.player.dead = true;
+  step(3);
+  return results;
+}
+
+// Gale: a Shock boon makes your hit jump to the nearest other foe
+export async function gale() {
+  const results = [];
+  const B = await import('../src/boons.js');
+  await toTitle();
+  press(0);
+  await waitFor('play');
+  const p = W.player;
+  p.maxHp = p.hp = 99999;
+  for (const e of W.enemies) { e.hp = 0; e.dead = true; }
+  step(0.5);
+  p.pos.copy(W.room.center);
+  B.takeBoon(p, { id: 'gale_attack', rarity: 'common', level: 1 });
+  spawnEnemy('grunt', p.pos.x + 1.5, p.pos.z, 0);
+  spawnEnemy('grunt', p.pos.x + 3.2, p.pos.z, 0);
+  step(1.2);
+  for (const e of W.enemies) Object.assign(e, { timer: 99, state: 'recover' });
+  const far = W.enemies.filter((e) => !e.dead).sort((a, b) => b.pos.x - a.pos.x)[0], before = far.hp;
+  p.facing.set(1, 0, 0);
+  pad.buttons[2].pressed = true; step(0.3); pad.buttons[2].pressed = false; step(0.1);
+  check(results, 'Shock jumps to the next foe', before - far.hp >= 6, `${before - far.hp} damage`);
+  check(results, 'Gale offers her own boons', B.offerBoons('gale', p, meta).every((b) => B.BOONS[b.id].patron === 'gale' || B.BOONS[b.id].duo?.includes('gale')));
+  p.hp = 0; p.dead = true;
+  step(3);
+  return results;
+}
+
+// The Wilds' newer recipes: stew and charm change you, a torch post lights the ground, spikes cut the dead
+export async function crafts() {
+  const results = [];
+  const { RECIPES, craft } = await import('../src/wild.js');
+  const r = (id) => RECIPES.find((x) => x.id === id);
+  await toPlayMenu();
+  clickSel(1); // Open World
+  press(0);
+  await waitFor('play');
+  const p = W.player, room = W.room;
+  Object.assign(W.run.wild.mats, { wood: 50, stone: 50, fiber: 50 });
+  const hp = p.maxHp, ammo = p.maxAmmo;
+  craft(r('stew'));
+  craft(r('charm'));
+  check(results, 'stew and the charm make you tougher', p.maxHp === hp + 15 && p.maxAmmo === ammo + 1, `${p.maxHp} hp, ${p.maxAmmo} shards`);
+  const fires = room.fires.length;
+  craft(r('torch'));
+  check(results, 'a torch post lights the ground', room.fires.length === fires + 1 && room.fires.at(-1).torch === true);
+  p.facing.set(0, 0, 1);
+  craft(r('spikes'));
+  const s = room.spikes.at(-1);
+  p.pos.x += 4; // stand clear, so the zombie stays on the stakes
+  spawnEnemy('zombie', s.x, s.z, 1);
+  step(2);
+  const z = W.enemies.find((e) => !e.dead && e.type === 'zombie' && Math.hypot(e.pos.x - s.x, e.pos.z - s.z) < 1);
+  if (z) { Object.assign(z, { timer: 99, state: 'recover', speed: 0 }); z.pos.set(s.x, 0, s.z); }
+  const before = z?.hp ?? 0;
+  step(1.2);
+  check(results, 'spike traps cut the dead', !!z && (z.dead || z.hp < before), z ? `${before} -> ${z.hp}` : 'no zombie');
+  p.hp = 0; p.dead = true;
+  step(3);
+  await toPlayMenu();
+  clickSel(0); // back to the Dungeon card for the other tests
   return results;
 }
