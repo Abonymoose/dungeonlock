@@ -243,6 +243,15 @@ function renderChoice() {
   ui.choiceScreen(c.header, c.items.map(c.toCard), menu.boon, hints);
 }
 
+// the pause screen's list of what you carry
+function carriedBoons() {
+  return (world.player?.boons ?? []).map((b) => {
+    const def = BOONS[b.id], r = RARITY.find((x) => x.id === b.rarity), pat = PATRONS[def.patron ?? def.duo[0]];
+    return { name: def.name, css: def.duo ? r.css : pat.css, sigil: def.duo ? null : pat.sigil, rarity: r.name, rarityCss: r.css, level: b.level, desc: describe(b),
+      kind: def.slot ? SLOT_NAME[def.slot] : def.duo ? 'Duo' : def.legendary ? 'Legendary' : 'Passive' };
+  });
+}
+
 function boonCard(p, b) {
   const def = BOONS[b.id], r = RARITY.find((x) => x.id === b.rarity), pat = PATRONS[def.patron ?? def.duo[0]];
   const holder = def.slot && p.boons.find((x) => BOONS[x.id].slot === def.slot && x.id !== b.id);
@@ -250,6 +259,7 @@ function boonCard(p, b) {
     kind: def.slot ? SLOT_NAME[def.slot].toUpperCase() : def.duo ? 'DUO' : def.legendary ? 'LEGENDARY' : 'PASSIVE',
     name: def.name, rarity: r.name, rarityCss: r.css, css: def.duo ? r.css : pat.css, desc: describe(b),
     note: holder ? `Replaces ${BOONS[holder.id].name}` : def.duo ? `${PATRONS[def.duo[0]].name} + ${PATRONS[def.duo[1]].name}` : '',
+    sigils: (def.duo ?? [def.patron]).map((id) => [PATRONS[id].sigil, PATRONS[id].css]),
   };
 }
 
@@ -257,7 +267,7 @@ function openBoon(pid, epic = false) {
   const p = world.player, pat = PATRONS[pid];
   const offer = () => offerBoons(pid, p, anvil()).map((b) => (epic && ['common', 'rare'].includes(b.rarity) ? { ...b, rarity: 'epic' } : b));
   openChoice({
-    header: { name: pat.name, title: pat.title, css: pat.css },
+    header: { name: pat.name, title: pat.title, css: pat.css, sigil: pat.sigil, line: pat.lines[Math.floor(Math.random() * pat.lines.length)] },
     items: offer(),
     toCard: (b) => boonCard(p, b),
     reroll: offer,
@@ -482,7 +492,7 @@ const RENDER = {
   anvil: () => ui.anvilScreen(UPGRADES, menu.anvil, meta),
   settings: () => ui.settingsScreen(settingRows(), menu.set, !!input.capture),
   codex: () => ui.codexScreen(TABS, menu.tab, codexBody(menu.tab)),
-  pause: () => ui.pauseScreen(menu.pause, world.player.cls, CAST, world.tutorial ? 'Leave the tutorial' : world.adventure ? 'Leave (your chapter is saved)' : world.run.keep ? 'Leave the Keep' : 'Abandon run'),
+  pause: () => ui.pauseScreen(menu.pause, world.player.cls, CAST, world.tutorial ? 'Leave the tutorial' : world.adventure ? 'Leave (your chapter is saved)' : world.run.keep ? 'Leave the Keep' : 'Abandon run', carriedBoons()),
   choice: () => renderChoice(),
 };
 function show(state) {

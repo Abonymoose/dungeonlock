@@ -17,7 +17,7 @@
     font-family: 'Press Start 2P', monospace; font-size: calc(var(--u) * 4); line-height: 1.7; user-select: none;
     touch-action: none; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; -webkit-user-select: none;
   }
-  .codex, .settings { touch-action: pan-y; }
+  .codex, .settings, .carried { touch-action: pan-y; }
   canvas { display: block; image-rendering: pixelated; }
   body::after {
     content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 1;
@@ -59,6 +59,35 @@
   .card.boon .rar { font-size: 0.6em; color: var(--r); margin-bottom: 0.8em; }
   .ftext.burn { color: #E07A3A; font-size: 0.8em; }
   .ftext.shock { color: #E8D25A; font-size: 0.8em; }
+  .ftext.doom { color: #C8463C; }
+  /* patron emblems: on the boon screen, its cards, the HUD column and the pause list */
+  .sigil { display: block; width: calc(var(--u) * 7); height: calc(var(--u) * 7); shape-rendering: crispEdges; }
+  .patron .sigil { width: calc(var(--u) * 21); height: calc(var(--u) * 21); margin: 0 auto calc(var(--u) * 4); filter: drop-shadow(var(--u) var(--u) 0 var(--onyx)); }
+  .patron .says { margin: calc(var(--u) * 3) 0 0; font-size: 0.75em; color: var(--sand); font-style: italic; }
+  .card.boon { position: relative; }
+  .card.boon .marks { position: absolute; top: calc(var(--u) * 4); right: calc(var(--u) * 4); display: flex; gap: calc(var(--u) * 2); opacity: 0.9; }
+  .slots .slot b .sigil { width: calc(var(--u) * 7); height: calc(var(--u) * 7); }
+  .pausewrap { display: flex; gap: calc(var(--u) * 5); align-items: flex-start; justify-content: center; max-width: 100%; }
+  .carried { text-align: left; width: calc(var(--u) * 150); max-height: 46vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--choc) var(--onyx); }
+  .carried h3 { margin: 0 0 0.6em; font-size: 0.8em; font-weight: normal; color: var(--oak); }
+  .carried .bn { display: flex; gap: calc(var(--u) * 3); align-items: flex-start; margin: 0 0 0.7em; font-size: 0.7em; }
+  .carried .bn .sigil { flex: none; margin-top: 0.2em; }
+  .carried .bn b { font-weight: normal; color: var(--c); }
+  .carried .bn em { font-style: normal; color: var(--r); margin-left: 0.8em; font-size: 0.85em; }
+  .carried .bn small { display: block; color: var(--oak); font-size: 0.9em; line-height: 1.5; }
+  /* statuses on a foe: one pip each above its health bar */
+  .ebar .st { position: absolute; left: 0; bottom: calc(var(--u) * 3); display: flex; gap: var(--u); }
+  .ebar .st u, #boss .st u { display: block; width: calc(var(--u) * 3); height: calc(var(--u) * 3); box-shadow: 0 0 0 var(--u) var(--onyx); }
+  #boss .st { display: flex; justify-content: center; gap: calc(var(--u) * 2); margin-top: calc(var(--u) * 3); min-height: calc(var(--u) * 3); }
+  #boss .st u { width: calc(var(--u) * 4); height: calc(var(--u) * 4); }
+  .st u.doom { animation: doomblink 0.3s steps(1) infinite; }
+  .st u.frozen { background: #E8F4FF; }
+  @keyframes doomblink { 50% { opacity: 0.3; } }
+  /* low health: the screen edge pulses red */
+  #hud::before { content: ''; position: fixed; inset: 0; pointer-events: none; opacity: 0; box-shadow: inset 0 0 calc(var(--u) * 40) rgba(155, 28, 28, 0.7); transition: opacity 0.4s; }
+  #hud.low::before { opacity: 1; animation: lowhp 1.1s ease-in-out infinite; }
+  @keyframes lowhp { 50% { opacity: 0.45; } }
+  @media (prefers-reduced-motion: reduce) { #hud.low::before, .st u.doom { animation: none; } }
   .ftext.status { color: var(--sand); font-size: 0.8em; }
   .pip { display: block; width: calc(var(--u) * 5); height: calc(var(--u) * 8); background: var(--choc); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
   .pip.full { background: var(--sand); }
@@ -313,6 +342,8 @@
     .pcard .art { aspect-ratio: 5 / 2; }
     .card { min-height: 0; }
     .card.boon { min-height: calc(var(--u) * 64); }
+    .patron .sigil { width: calc(var(--u) * 14); height: calc(var(--u) * 14); margin-bottom: calc(var(--u) * 2); }
+    .carried { max-height: 40vh; }
     #screen { gap: calc(var(--u) * 4); padding: calc(var(--u) * 5); }
     #screen h1 { font-size: 2.2em; }
     #banner { top: 22%; }
@@ -337,7 +368,7 @@
     <div class="xpwrap"><div class="xp"><i></i></div><span class="lv"></span></div>
   </div>
 </div>
-<div id="boss" class="hidden"><div class="name">THE WARDEN</div><div class="bar frame"><div class="lag"></div><div class="fill"></div></div></div>
+<div id="boss" class="hidden"><div class="name">THE WARDEN</div><div class="bar frame"><div class="lag"></div><div class="fill"></div></div><div class="st"></div></div>
 <div id="prompt" class="panel hidden"></div>
 <div id="banner"><h1></h1><p></p></div>
 <div id="tutorial" class="hidden"></div>

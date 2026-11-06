@@ -6,10 +6,12 @@ const hud = $('#hud'), screen = $('#screen'), prompt = $('#prompt'), banner = $(
 const hpFill = $('#hud .hp-fill'), hpLag = $('#hud .hp-lag'), hpText = $('#hud .hp-text'), ammoEl = $('#hud .ammo');
 const livesEl = $('#hud .lives'), lvEl = $('#hud .lv'), xpFill = $('#hud .xp i');
 const keysEl = $('#hud .keys'), ashEl = $('#hud .ash'), depthEl = $('#hud .depth'), slotsEl = $('#hud .slots');
-const bossEl = $('#boss'), bossName = $('#boss .name'), bossFill = $('#boss .fill'), bossLag = $('#boss .lag'), barsEl = $('#bars');
+const bossEl = $('#boss'), bossSt = $('#boss .st'), bossName = $('#boss .name'), bossFill = $('#boss .fill'), bossLag = $('#boss .lag'), barsEl = $('#bars');
 
 const KEY_SVG = '<svg class="ico" viewBox="0 0 8 4"><path fill="currentColor" fill-rule="evenodd" d="M0 0h3v4H0zM1 1h1v2H1zM3 1h5v1H3zM5 2h1v1H5zM7 2h1v2H7z"/></svg>';
 const set = (el, html) => { if (el.innerHTML !== html) el.innerHTML = html; };
+// a patron's emblem: rows of '#' and '.' drawn as pixels
+export const sigil = (rows, css) => `<svg class="sigil" viewBox="0 0 7 7" style="color:${css}" aria-hidden="true"><path fill="currentColor" d="${rows.flatMap((r, y) => [...r].map((ch, x) => (ch === '#' ? `M${x} ${y}h1v1h-1z` : ''))).join('')}"/></svg>`;
 
 export function showHud(on) { hud.classList.toggle('hidden', !on); if (!on) { updateBoss(null); updateEnemyBars([]); } }
 
@@ -29,12 +31,13 @@ export function updateHud(p, run, xpNeed) {
   set(ashEl, `${run.ash}<small>${run.currency ?? 'ASH'}</small>`);
   hud.classList.toggle('noxp', !!run.noXp);
   set(depthEl, run.label ?? (run.depth ? `DEPTH ${run.depth}` : ''));
+  hud.classList.toggle('low', k < 0.3 && !p.dead);
 }
 
 // Left column, like Hades: one icon per filled move slot, patron-coloured, with its level
 export function setSlots(slots) {
   set(slotsEl, slots.map((s) => `
-    <div class="slot" style="--c:${s.color}"><b>${s.glyph}</b>${s.level > 1 ? `<i>${s.level}</i>` : ''}</div>`).join(''));
+    <div class="slot" style="--c:${s.color}"><b>${s.sigil ? sigil(s.sigil, s.color) : s.glyph}</b>${s.level > 1 ? `<i>${s.level}</i>` : ''}</div>`).join(''));
 }
 
 let bossLagK = 1;
@@ -46,20 +49,26 @@ export function updateBoss(boss) {
   bossLagK = k > bossLagK ? k : bossLagK + (k - bossLagK) * 0.03;
   bossFill.style.width = k * 100 + '%';
   bossLag.style.width = bossLagK * 100 + '%';
+  set(bossSt, statusPips(boss));
 }
 
 // Small bars over enemies, only once they've been hurt (bosses use the top bar)
 const bars = new Map();
+const STATUS_CSS = { burn: '#E07A3A', chill: '#9FC0D6', corrode: '#7FA37A', hex: '#B49AD0', doom: '#C8463C', mark: '#46C2A8' };
+const statusPips = (e) => Object.keys(STATUS_CSS).filter((k) => e.status?.[k]).map((k) => `<u class="${k}" style="background:${STATUS_CSS[k]}"></u>`).join('') + (e.frozen > 0 ? '<u class="frozen"></u>' : '');
 export function updateEnemyBars(enemies) {
   const live = new Set();
   for (const e of enemies) {
-    if (e.dead || e.hp >= e.maxHp || e.T.boss || e.type === 'dummy') continue;
+    if (e.dead || e.T.boss || e.type === 'dummy') continue;
+    const pips = statusPips(e);
+    if (e.hp >= e.maxHp && !pips) continue;
     live.add(e);
     let el = bars.get(e);
-    if (!el) { el = document.createElement('div'); el.className = 'ebar' + (e.maxHp > 80 ? ' big' : ''); el.innerHTML = '<i></i>'; barsEl.append(el); bars.set(e, el); }
+    if (!el) { el = document.createElement('div'); el.className = 'ebar' + (e.maxHp > 80 ? ' big' : ''); el.innerHTML = '<i></i><span class="st"></span>'; barsEl.append(el); bars.set(e, el); }
     const s = toScreen(e.pos, e.radius * 2 + 1.3);
     el.style.transform = `translate(${Math.round(s.x)}px, ${Math.round(s.y)}px) translateX(-50%)`;
     el.firstChild.style.width = (100 * e.hp / e.maxHp) + '%';
+    set(el.lastChild, pips);
   }
   for (const [e, el] of bars) if (!live.has(e)) { el.remove(); bars.delete(e); }
 }
@@ -189,6 +198,7 @@ export function anvilScreen(upgrades, sel, meta) {
 export function choiceScreen(header, cards, sel, hints) {
   const html = cards.map((c, i) => `
     <div class="card boon ${i === sel ? 'sel' : ''}" data-sel="${i}" style="--c:${c.css}; --r:${c.rarityCss ?? c.css}">
+      ${c.sigils ? `<div class="marks">${c.sigils.map(([rows, css]) => sigil(rows, css)).join('')}</div>` : ''}
       <div class="kind">${c.kind ?? ''}</div>
       <h3>${c.name.toUpperCase()}</h3>
       ${c.rarity ? `<div class="rar">${c.rarity.toUpperCase()}</div>` : ''}
@@ -196,18 +206,24 @@ export function choiceScreen(header, cards, sel, hints) {
       ${c.note ? `<p class="dim">${c.note}</p>` : ''}
     </div>`).join('');
   showScreen(`
-    <div class="patron" style="--c:${header.css}"><h2>${header.name.toUpperCase()}</h2><div class="tag">${header.title}</div></div>
+    <div class="patron" style="--c:${header.css}">${header.sigil ? sigil(header.sigil, header.css) : ''}<h2>${header.name.toUpperCase()}</h2><div class="tag">${header.title}</div>${header.line ? `<p class="says">"${header.line}"</p>` : ''}</div>
     <div class="cards ${cards.length > 5 ? 'many' : ''}">${html}</div>
     <div class="hints">${hints}</div>`);
 }
 
-export function pauseScreen(sel, cls, cast, leave = 'Abandon run') {
+// boons: [{ name, css, sigil, rarity, rarityCss, level, kind, desc }]
+export function pauseScreen(sel, cls, cast, leave = 'Abandon run', boons = []) {
   const items = ['Resume', leave, 'Settings'].map((t, i) =>
     `<div class="item ${i === sel ? 'sel' : ''}" data-sel="${i}"><span>${t}</span></div>`).join('');
+  const carried = boons.length ? `<div class="panel carried"><h3>Boons</h3>${boons.map((b) => `
+      <div class="bn" style="--c:${b.css}; --r:${b.rarityCss}">${b.sigil ? sigil(b.sigil, b.css) : '<i class="sigil"></i>'}
+        <span><b>${b.name}</b><em>${b.kind} &nbsp;${b.rarity}${b.level > 1 ? ` &nbsp;LV ${b.level}` : ''}</em><small>${b.desc}</small></span></div>`).join('')}</div>` : '';
   showScreen(`<h2>Paused</h2><div class="list">${items}</div>
-    <div class="panel moves">
-      ${moveRow('attack', cls.attack.name, cls.attack.desc)}${cls.special ? moveRow('special', cls.special.name, cls.special.desc) : ''}
-      ${cls.grounded ? '' : moveRow('cast', cast.name, cast.desc)}${moveRow('dash', cls.dash.name)}${moveRow('interact', 'Use')}
+    <div class="pausewrap">
+      <div class="panel moves">
+        ${moveRow('attack', cls.attack.name, cls.attack.desc)}${cls.special ? moveRow('special', cls.special.name, cls.special.desc) : ''}
+        ${cls.grounded ? '' : moveRow('cast', cast.name, cast.desc)}${moveRow('dash', cls.dash.name)}${moveRow('interact', 'Use')}
+      </div>${carried}
     </div>`);
 }
 

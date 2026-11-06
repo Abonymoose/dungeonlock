@@ -749,7 +749,7 @@ export async function shop() {
   check(results, 'each ware sells once', W.run.ash === ash, `${W.run.ash}`);
   press(1);
   step(0.1);
-  check(results, 'the doors stay open', W.room.doors.every((x) => x.open) && W.state === 'play');
+  check(results, 'the doors stay open', W.room.doors.every((x) => x.open || x.locked) && W.state === 'play'); // a vault door stays locked until you use a key
   W.player.hp = 0; W.player.dead = true;
   step(3);
   return results;
@@ -830,6 +830,60 @@ export async function shrine() {
   const g = W.enemies.find((e) => !e.dead && e.type === 'grunt');
   check(results, 'while it lasts, foes are tougher', g?.maxHp === Math.round(TYPES.grunt.hp * 1.4), `${g?.maxHp}`);
   W.player.hp = 0; W.player.dead = true;
+  step(3);
+  return results;
+}
+
+// Knell and Vigil: Doom lands later, all at once; a Mark turns the next hit into a Critical. The boon screen and pause list show them.
+export async function patrons() {
+  const results = [];
+  const B = await import('../src/boons.js');
+  await toTitle();
+  press(0);
+  await waitFor('play');
+  const p = W.player;
+  p.maxHp = p.hp = 99999;
+  for (const e of W.enemies) { e.hp = 0; e.dead = true; }
+  step(0.5);
+  p.pos.copy(W.room.center);
+  spawnEnemy('brute', p.pos.x + 3, p.pos.z, 3);
+  step(1.2);
+  const e = W.enemies.find((x) => !x.dead);
+  Object.assign(e, { timer: 99, state: 'recover' });
+  B.takeBoon(p, { id: 'knell_attack', rarity: 'common', level: 1 });
+  B.takeBoon(p, { id: 'vigil_special', rarity: 'common', level: 1 });
+  damage(e, 1, p.pos, { source: p, tag: 'attack' });
+  const doom = e.status?.doom?.v, hp = e.hp;
+  step(0.6);
+  const early = e.hp;
+  step(0.8);
+  check(results, 'Doom waits, then strikes all at once', doom === 10 && early === hp && e.hp < hp && !e.status.doom, `${hp} -> ${early} -> ${e.hp}`);
+  damage(e, 1, p.pos, { source: p, tag: 'special' });
+  check(results, 'a Vigil Special leaves a Mark', e.status?.mark?.v === 100);
+  const before = e.hp;
+  damage(e, 10, p.pos, { source: p, tag: 'attack' });
+  const crit = before - e.hp, b2 = e.hp;
+  damage(e, 10, p.pos, { source: p, tag: 'attack' });
+  check(results, 'the Mark makes the next hit a Critical, then is spent', crit >= 2 * (b2 - e.hp) - 1 && !e.status.mark, `${crit} vs ${b2 - e.hp}`);
+  e.status = { burn: { dps: 1, t: 9, tick: 0.5 }, mark: { v: 50, t: 9 } };
+  step(0.1);
+  check(results, 'statuses show over the foe\'s health bar', document.querySelectorAll('#bars .st u').length >= 2);
+  const descs = Object.values(B.BOONS).map((d) => d.desc(d.base));
+  check(results, 'every boon reads cleanly', descs.every((s) => typeof s === 'string' && !/NaN|undefined/.test(s)), `${descs.length} boons`);
+  check(results, 'Knell and Vigil offer their own boons', ['knell', 'vigil'].every((pid) => B.offerBoons(pid, p, meta).every((b) => B.BOONS[b.id].patron === pid || B.BOONS[b.id].duo?.includes(pid))));
+  W.room.addPickup('boon', p.pos.x, p.pos.z, 'knell');
+  step(0.3);
+  const scr = document.getElementById('screen');
+  check(results, 'the boon screen shows the patron\'s emblem and a line', W.state === 'choice' && !!scr.querySelector('.patron .sigil') && !!scr.querySelector('.patron .says') && scr.querySelectorAll('.card .marks .sigil').length >= 3);
+  step(0.5);
+  clickSel(0);
+  step(2);
+  press(9);
+  step(0.1);
+  check(results, 'pause lists the boons you carry', W.state === 'pause' && scr.querySelectorAll('.carried .bn').length === p.boons.length, `${scr.querySelectorAll('.carried .bn').length} of ${p.boons.length}`);
+  press(9);
+  step(0.1);
+  p.hp = 0; p.dead = true;
   step(3);
   return results;
 }

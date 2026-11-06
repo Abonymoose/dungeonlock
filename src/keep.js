@@ -50,6 +50,9 @@ const LINES = {
     [[MAREN, 'Rattle was the first skeleton ever to walk out of the Lock. He has been here so long he forgot to be frightening.']],
     [[MAREN, 'Below the first Lock the stairs run into water. I do not know why. I have stopped asking.']],
     [[MAREN, 'There is a fifth patron now. Gale. She howls down the stairwell at night. Her lightning jumps from foe to foe, so fight her way in a crowd.']],
+    [[MAREN, 'Two more patrons woke this week. Knell rings a bell when something is about to die. Vigil just watches. I liked it better when they slept.']],
+    [[MAREN, "Knell's Doom lands a breath after you strike. Hit again before it falls and the blow only gets heavier."]],
+    [[MAREN, "Vigil marks a weak spot. Your next hit there is a Critical. Hit the mark, then hit it again: that's the whole trick."]],
   ],
   idle: [[MAREN, "The gate's behind me whenever you're ready."]],
   rattle: [
@@ -68,6 +71,8 @@ const LINES = {
     [RATTLE, 'There is a Peddler down there. Hooded fellow. Sells keys and boons for the ash in your pockets. Never tells me his name. Rude.'],
     [RATTLE, 'Shrines offer bargains. Never take a bargain from a glowing red ball. I did once. That is how I lost the arm.'],
     [RATTLE, 'Dash through a blow just as it lands and the whole world slows down. Perfect dodge, they call it. I call it showing off.'],
+    [RATTLE, 'Pause in the middle of a fight and you can read every boon you carry. I read mine every morning. I have none. It is a short read.'],
+    [RATTLE, 'Little coloured squares over a foe tell you what you did to it. Red blinking means Doom is coming. For them. Probably.'],
     [RATTLE, 'Feats pay ash the moment you do them. I earned one once: Stood In A Corner For Ninety Years. Nobody gave me ash.'],
   ],
 };

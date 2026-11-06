@@ -95,6 +95,7 @@ const SECTIONS = [
   () => entry('Moves', `<p>Change these in Settings.</p><dl>${ACTIONS.map((a) => `<dt>${a[0].toUpperCase() + a.slice(1)}</dt><dd>${settings.keys[a].map(keyName).join(' or ')}, or ${padName(settings.pad[a])} on a controller</dd>`).join('')}</dl>`)
     + entry('Moving and menus', '<p>Move with WASD, the arrow keys or the left stick. Aim with the mouse or the right stick. In menus, Enter or A selects, Esc or B goes back, and Tab or Y opens extras.</p>')
     + entry('Perfect dodge', '<p>Dash through an attack just as it lands. Time slows for a moment, and your hits deal 50% more for a second and a half.</p>')
+    + entry('Reading a fight', '<p>Coloured squares over a foe show what you have done to it: orange Burn, pale blue Chill, green Corrode, lilac Hex, blinking red Doom, teal Mark, white Frozen. The screen edge pulses red when you are below 30% health. Pause to read every boon you carry.</p>')
     + entry('On a phone', '<p>Hold it sideways. Drag anywhere on the left half of the screen to move, and use the buttons on the right. You face the nearest enemy on your own. Tap menus and hints directly.</p>'),
 ];
 

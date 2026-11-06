@@ -11,7 +11,7 @@ const projectiles = [], telegraphs = [], effects = [], texts = [], trails = [];
 const fxLayer = document.getElementById('fx');
 const tmp = new THREE.Vector3(), guardV = new THREE.Vector3();
 
-// Filled in by boons.js, so combat never imports the boon system: dmgMult, onHit, onCast, onDash, playerHurt, onKill
+// Filled in by boons.js, so combat never imports the boon system: dmgMult, crit, onHit, onCast, onDash, playerHurt, onKill
 export const hooks = {};
 
 // ---- entities ----
@@ -85,6 +85,7 @@ export function damage(target, amount, from, { knockback = 0, stun = 0, crit = f
   const byPlayer = target.team === 1 && (source?.team === 0 || tag === 'status');
   if (byPlayer && world.player?.dodgeT > 0) amount *= 1.5;
   if (byPlayer && hooks.dmgMult) amount *= hooks.dmgMult(target, tag);
+  if (byPlayer && !crit && hooks.crit) { const c = hooks.crit(target, tag); if (c > 1) { amount *= c; crit = true; } }
   if (target.team === 0 && hooks.playerHurt) amount = hooks.playerHurt(source, amount);
   if (target.team === 0 && settings.hardcore) amount *= 1.5;
   if (target.team === 0 && world.run?.curse?.id === 'glass') amount *= 1.3;

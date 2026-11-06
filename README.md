@@ -18,7 +18,7 @@ It works with a keyboard and mouse, with a controller, or on a phone held sidewa
 <td width="33%"><img src="assets/shots/card-adventure.png" alt="The swordsmith at the castle gate at dusk"></td>
 </tr>
 <tr>
-<td valign="top"><b>The Dungeon</b><br>Start in the Keep, pick one of five classes (Knight, Rogue, Wizard, Barbarian, Necromancer) and one of their three weapons, and descend. Five patrons offer boons for your moves. A boss waits at depth 9, and the Lock after it needs a key. Below the first Lock the dungeon floods into the Sunken Vaults, ruled by the Drowned King. Elites carry affixes. Spend run ash at the Peddler, or strike a bargain at a Shrine. Ash from each run buys lasting upgrades and new weapons, and Feats pay out more.</td>
+<td valign="top"><b>The Dungeon</b><br>Start in the Keep, pick one of five classes (Knight, Rogue, Wizard, Barbarian, Necromancer) and one of their three weapons, and descend. Seven patrons offer boons for your moves, each with its own status: Burn, Chill, Corrode, Hex, Shock, Doom and Mark. A boss waits at depth 9, and the Lock after it needs a key. Below the first Lock the dungeon floods into the Sunken Vaults, ruled by the Drowned King. Elites carry affixes. Spend run ash at the Peddler, or strike a bargain at a Shrine. Ash from each run buys lasting upgrades and new weapons, and Feats pay out more.</td>
 <td valign="top"><b>The Wilds</b> (beta)<br>A huge island of meadow, forest, rock and lakes. Gather wood, stone and fiber by day and craft campfires, torches, barricades, spike traps, stew and more. When night falls, the dead rise, and every fifth night brings the Grave Lord.</td>
 <td valign="top"><b>Adventure</b><br>Six chapters as a village swordsmith with no magic, only one sword. Go from your forge, down the King's Road and into the castle to fight the Black Knight and rescue the princess. Each chapter start is saved.</td>
 </tr>
@@ -102,6 +102,7 @@ await T.shop();           // the Peddler
 await T.shrine();         // a Shrine's bargain
 await T.dodge();          // perfect dodges
 await T.graveLord();      // the Wilds' boss night
+await T.patrons();        // Knell's Doom, Vigil's Mark, and the boon screens
 await T.saves();
 await T.settingsCheck();
 ```
