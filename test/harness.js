@@ -559,8 +559,8 @@ export async function hardcore() {
   return results;
 }
 
-// The Keep: the Dungeon card leads into it; Maren and Rattle talk; the Anvil opens and returns; the gate leads to
-// class select; a finished run comes back to the Keep with news for Maren
+// The Keep: the Dungeon card leads into it; no one lives there; the Anvil opens and returns; the gate leads to
+// class select; a finished run comes back to the Keep
 export async function keep() {
   const results = [];
   const go = async (cond, ms = 6000) => { for (let t = 0; t < ms && !cond(); t += 100) { await sleep(100); step(0.02); } return cond(); };
@@ -568,18 +568,7 @@ export async function keep() {
   clickSel(0);
   check(results, 'the Dungeon card opens the Keep', await go(() => W.state === 'play' && W.room?.plan.kind === 'keep'), W.room?.plan.kind);
   const k = W.room.keep, p = W.player;
-  check(results, 'Maren, Rattle and the Anvil are there', k.people.length === 2 && !!k.anvil);
-  const talkTo = async (who) => {
-    const at = k.people.find((x) => x.name === who).pos;
-    p.pos.copy(at).add(new THREE.Vector3(0.9, 0, 0.9));
-    step(0.1);
-    press(5); // Use
-    const ok = W.state === 'talk' && document.getElementById('talk').textContent.includes(who);
-    for (let i = 0; i < 12 && W.state === 'talk'; i++) { step(0.35); press(0); }
-    return ok;
-  };
-  check(results, 'Maren talks', await talkTo('Maren'));
-  check(results, 'Rattle talks', await talkTo('Rattle'));
+  check(results, 'the Anvil is there, and no one else', !!k.anvil && !W.room.extras?.length);
   p.pos.copy(k.anvil).add(new THREE.Vector3(0.9, 0, 0.9));
   step(0.1);
   press(5);
@@ -594,7 +583,7 @@ export async function keep() {
   W.player.hp = 0; W.player.dead = true;
   step(3);
   press(0);
-  check(results, 'a finished run comes back to the Keep, with news', await go(() => W.state === 'play' && W.room?.plan.kind === 'keep') && meta.keepNews === true && meta.lastRun?.depth === 0, W.state);
+  check(results, 'a finished run comes back to the Keep', await go(() => W.state === 'play' && W.room?.plan.kind === 'keep'), W.state);
   return results;
 }
 

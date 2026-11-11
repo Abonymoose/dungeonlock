@@ -140,9 +140,6 @@ function endRun(kind) {
   meta.runs++;
   if (kind === 'escaped') { meta.escapes++; earn('escape'); }
   const wild = world.room?.plan.kind === 'wild';
-  // what Maren will hear about in the Keep
-  if (!wild) meta.lastRun = { kind, depth: run.depth, boss: world.room?.plan.kind === 'boss' ? world.room.plan.waves[0]?.[0] : null, record: run.depth > meta.bestDepth, hardcore: !!settings.hardcore };
-  if (!wild) meta.keepNews = true;
   if (wild) meta.bestNights = Math.max(meta.bestNights ?? 0, run.depth); // in the Wilds, depth counts nights survived
   else meta.bestDepth = Math.max(meta.bestDepth, run.depth);
   saveMeta();
@@ -401,10 +398,9 @@ function roomLogic(dt) {
     wildPrompt = f.prompt;
   }
   if (room.plan.kind === 'keep') {
-    const k = keepUpdate(room, p, dt);
+    const k = keepUpdate(room, p);
     wildPrompt = k.prompt;
     if (k.anvil) { menu.anvilFrom = 'keep'; return enterMenu('anvil'); }
-    if (k.lines) return talk(k.lines);
   }
   if (room.plan.kind === 'wild') {
     const w = wildUpdate(dt);

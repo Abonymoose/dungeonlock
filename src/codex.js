@@ -40,7 +40,7 @@ const DUNGEON_FOES = BESTIARY.map((e) => e.id).filter((id) => !WILDS_FOES.includ
 const ELITES = () => entry('Elites', `<p>Bigger, armoured and tinted crimson, more common the deeper you go. Each carries one affix, named over its head as it rises:</p><ul>${Object.values(AFFIXES).map((a) => `<li><b>${a.name}</b>: ${a.about}.</li>`).join('')}</ul>`, 'var(--crimson)');
 
 const DEPTHS = [
-  ['The Keep', 'Where every Dungeon run starts and ends: the last dry room above the dungeon. Talk to Maren, who keeps the fire and has something to say after each run, and to Rattle, a skeleton who walked out of the Lock and stayed. The Anvil is in the corner; the gate takes you to class select and down.', 'keep'],
+  ['The Keep', 'Where every Dungeon run starts and ends: the last dry room above the dungeon. The Anvil is in the corner; the gate takes you to class select and down.', 'keep'],
   ['The Cells', 'Depths 1 and 2 of every ten. Warm stone and orange torchlight.', 'cells'],
   ['The Crypt', 'Depths 3 to 5. Cold blue fire and great stone slabs.', 'crypt'],
   ['The Rot', 'Depths 6 to 8. Green light, broken floors and rubble everywhere.', 'rot'],

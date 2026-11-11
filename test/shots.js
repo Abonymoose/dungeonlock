@@ -284,16 +284,20 @@ export async function newShots() {
     T.step(0.2);
     out.push(await shot('biome-' + name, W.room.center, { zoom: 1 }));
   }
-  // the Keep, where a run ends: Maren and Rattle by the torches
+  out.push(await keepShot());
+  return out;
+}
+
+// the Keep, where a run ends (from inside a run).  Run:  await S.keepShot();
+export async function keepShot() {
   W.player.lives = 0;
   W.player.hp = 0; W.player.dead = true;
   T.step(3);
   T.press(0);
   for (let i = 0; i < 60 && !(W.state === 'play' && W.room?.plan.kind === 'keep'); i++) { await T.sleep(100); T.step(0.02); }
-  W.player.pos.copy(W.room.keep.people[0].pos).add({ x: 1.4, y: 0, z: 0.6 });
+  W.player.pos.copy(W.room.keep.anvil).add({ x: 1.4, y: 0, z: 0.6 });
   T.step(0.3);
-  out.push(await shot('biome-keep', W.room.center, { zoom: 1.1 }));
-  return out;
+  return shot('biome-keep', W.room.center, { zoom: 1.1 });
 }
 
 // Portraits for classes added later (the Barbarian and the Necromancer).  Run:  await S.classShots();

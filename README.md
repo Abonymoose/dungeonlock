@@ -63,7 +63,7 @@ src/
   render.js       low-res render, outlines, toon lighting, camera
   input.js        keyboard, mouse and controller
   touch.js        on-screen phone controls
-  keep.js         the Keep between runs: Maren, Rattle and what they say
+  keep.js         the Keep between runs: the Anvil and the gate
   feats.js        Feats: one-time goals that pay ash
   shop.js         the Peddler's wares and the Shrine's bargains
   classes.js      the five classes, their weapons, and the Swordsmith
