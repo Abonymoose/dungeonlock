@@ -824,6 +824,7 @@ export async function shrine() {
 }
 
 // Knell and Vigil: Doom lands later, all at once; a Mark turns the next hit into a Critical. The boon screen and pause list show them.
+// Boon doors lean towards patrons you have met, and only offer those once you have met three.
 export async function patrons() {
   const results = [];
   const B = await import('../src/boons.js');
@@ -859,6 +860,12 @@ export async function patrons() {
   check(results, 'statuses show over the foe\'s health bar', document.querySelectorAll('#bars .st u').length >= 2);
   const descs = Object.values(B.BOONS).map((d) => d.desc(d.base));
   check(results, 'every boon reads cleanly', descs.every((s) => typeof s === 'string' && !/NaN|undefined/.test(s)), `${descs.length} boons`);
+  const { rollDoors } = await import('../src/run.js');
+  const doorPatrons = (boons) => Array.from({ length: 400 }, (_, i) => rollDoors(1 + (i % 7), { boons, keyDoorsSeen: 2 })).flat().map((d) => d.patron).filter(Boolean);
+  const three = doorPatrons(['cinder_attack', 'knell_dash', 'gale_cast']);
+  check(results, 'with three patrons met, boon doors offer only them', three.length > 100 && three.every((x) => ['cinder', 'knell', 'gale'].includes(x)), `${three.length} doors`);
+  const one = doorPatrons(['vigil_attack']), share = one.filter((x) => x === 'vigil').length / one.length;
+  check(results, 'a patron you have met turns up far more often than 1 in 7', share > 0.3 && new Set(one).size === 7, `${Math.round(share * 100)}%`);
   check(results, 'Knell and Vigil offer their own boons', ['knell', 'vigil'].every((pid) => B.offerBoons(pid, p, meta).every((b) => B.BOONS[b.id].patron === pid || B.BOONS[b.id].duo?.includes(pid))));
   W.room.addPickup('boon', p.pos.x, p.pos.z, 'knell');
   step(0.3);

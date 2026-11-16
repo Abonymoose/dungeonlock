@@ -102,7 +102,7 @@ await T.shop();           // the Peddler
 await T.shrine();         // a Shrine's bargain
 await T.dodge();          // perfect dodges
 await T.graveLord();      // the Wilds' boss night
-await T.patrons();        // Knell's Doom, Vigil's Mark, and the boon screens
+await T.patrons();        // Knell's Doom, Vigil's Mark, the boon screens, and patron doors
 await T.saves();
 await T.settingsCheck();
 ```

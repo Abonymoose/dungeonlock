@@ -1,6 +1,6 @@
 import { BOSS_DEPTH } from './config.js';
 import { heal } from './combat.js';
-import { PATRONS } from './boons.js';
+import { PATRONS, BOONS } from './boons.js';
 
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const rint = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
@@ -213,6 +213,8 @@ function rollWaves(depth, kind) {
 
 // ---- door choices ----
 
+export const MAX_PATRONS = 3;
+
 // What the next room offers is shown above its door, Hades-style. Keys are scarce: vaults cost one, and so does the Lock.
 export function rollDoors(depth, run) {
   // endless: the Warden returns every 10 depths, and each Lock offers escape (with a key) or the way deeper
@@ -237,9 +239,11 @@ export function rollDoors(depth, run) {
   if (next === 1) doors[0] = { kind: 'combat', reward: 'boon' };
   if (!doors.some((d) => d.reward === 'key') && (next === 3 || next === 6) && run.keyDoorsSeen < 2) doors[1] = { kind: 'combat', reward: 'key' };
   if (next >= 2 && Math.random() < 0.4) doors.push({ kind: 'vault', reward: 'treasure', locked: true });
-  // boon doors name their patron, and two boon doors never offer the same one
-  const patrons = Object.keys(PATRONS).sort(() => Math.random() - 0.5);
-  for (const d of doors) if (d.reward === 'boon' || d.reward === 'treasure') d.patron = patrons.pop();
+  // boon doors name their patron, and two boon doors never offer the same one. Each leans half the time towards a
+  // patron you've already taken a boon from, so duos and legendaries turn up; once you have three, only they appear.
+  const met = [...new Set((run.boons ?? []).flatMap((id) => BOONS[id].duo ?? [BOONS[id].patron]))].sort(() => Math.random() - 0.5);
+  const fresh = met.length >= MAX_PATRONS ? [] : Object.keys(PATRONS).filter((p) => !met.includes(p)).sort(() => Math.random() - 0.5);
+  for (const d of doors) if (d.reward === 'boon' || d.reward === 'treasure') d.patron = (met.length && (!fresh.length || Math.random() < 0.5) ? met : fresh).pop();
   run.keyDoorsSeen += doors.filter((d) => d.reward === 'key').length;
   return lock ? [{ kind: 'gate', reward: null, locked: true }, ...doors.slice(0, 2)] : doors;
 }
