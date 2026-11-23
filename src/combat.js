@@ -89,6 +89,7 @@ export function damage(target, amount, from, { knockback = 0, stun = 0, crit = f
   if (target.team === 0 && hooks.playerHurt) amount = hooks.playerHurt(source, amount);
   if (target.team === 0 && settings.hardcore) amount *= 1.5;
   if (target.team === 0 && world.run?.curse?.id === 'glass') amount *= 1.3;
+  if (target.team === 0 && world.run?.vows?.includes('brittle')) amount *= 1.25;
   if (target.team === 0 && world.run) world.run.hurt = true;
   if (target.team === 0 && source?.affix === 'vampiric' && !source.dead) heal(source, amount * 2); // it drinks what it takes
   // a shieldbearer takes a fifth of any hit that comes from in front of it

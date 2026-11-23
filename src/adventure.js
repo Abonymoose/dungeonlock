@@ -7,7 +7,7 @@ import { spawnEnemy } from './enemies.js';
 import { noise, WATER, SAND, MEADOW, GRASS, FOREST } from './wild.js';
 import { MEDIEVAL_SCALE as S } from './assets.js';
 
-// Adventure mode, "The Swordsmith": six chapters from your village to the top of the castle tower.
+// Adventure mode, "The Swordsmith": eight chapters from your village to the top of the castle tower.
 // Chapters 1-3 are outdoor fields (built by wild.js), 4-6 are castle rooms (built by room.js). Between them is your forge.
 
 const MORNING = { sky: 0xe4d8c4, ground: 0x4a5c36, sun: 0xfff0d8, amb: 1.55, sunI: 2.7, grade: [1.0, 0.96, 0.88] };
@@ -40,6 +40,11 @@ export const CHAPTERS = [
     lines: [['You', "Their camp is outside the wall. The gate's held. Shields up front: I'll have to get round them."]],
   },
   {
+    title: 'The Barracks', sub: 'Under the wall', room: 'combat',
+    waves: [['soldier', 'halberdier', 'soldier'], ['halberdier', 'halberdier', 'crossbowman', 'guard']],
+    lines: [['You', 'The barracks. Long blades in the racks, and men to hold them. Keep to their sides.']],
+  },
+  {
     title: 'The Courtyard', sub: 'Inside the walls', room: 'combat',
     waves: [['soldier', 'soldier', 'guard'], ['crossbowman', 'crossbowman', 'soldier', 'guard'], ['captain', 'soldier']],
     lines: [['You', 'Inside. Their captain is somewhere in the yard.']],
@@ -48,6 +53,11 @@ export const CHAPTERS = [
     title: 'The Great Hall', sub: "The usurper's household", room: 'combat',
     waves: [['guard', 'guard', 'soldier'], ['guard', 'captain', 'crossbowman', 'crossbowman']],
     lines: [['You', 'The great hall. The tower stair is at the back.']],
+  },
+  {
+    title: 'The Tower Stair', sub: 'His last men', room: 'combat',
+    waves: [['guard', 'halberdier', 'crossbowman'], ['halberdier', 'captain', 'guard', 'crossbowman']],
+    lines: [['You', 'The stair, and every man he has left standing on it. Nearly there.']],
   },
   {
     title: 'The Tower', sub: 'At the top of the stairs', room: 'boss', waves: [['blackknight']],

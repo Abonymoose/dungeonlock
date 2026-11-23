@@ -313,7 +313,7 @@ export async function fullRun(maxRooms = 14) {
 export async function tutorial() {
   const results = [], t = () => W.tutorial;
   await toPlayMenu();
-  clickSel(3); // Tutorial
+  clickSel(4); // Tutorial
   await waitFor('play');
   for (let i = 0; i < 50 && !W.tutorial; i++) await sleep(100); // it starts once the fade-in finishes
   check(results, 'tutorial starts', !!W.tutorial, W.room?.plan.kind);
@@ -467,9 +467,10 @@ export async function adventure() {
   W.player.hp = 0; W.player.dead = true;
   step(2);
   check(results, 'falling shows the chapter screen', W.state === 'over' && /Chapter/.test(document.querySelector('#screen').textContent), W.state);
-  meta.adventure.chapter = 5; // straight to the tower
+  const last = (await import('../src/adventure.js')).CHAPTERS.length - 1;
+  meta.adventure.chapter = last; // straight to the tower
   press(0);
-  await until(() => W.state === 'talk' && W.adventure.chapter === 5);
+  await until(() => W.state === 'talk' && W.adventure.chapter === last);
   check(results, 'a fall restarts from the saved chapter', W.room.plan.kind === 'boss' && W.adventure.edge === 1, W.room?.plan.kind);
   skipTalk();
   tough();
@@ -881,5 +882,73 @@ export async function patrons() {
   step(0.1);
   p.hp = 0; p.dead = true;
   step(3);
+  return results;
+}
+
+// Door signs sit on the doors; Trials pay an Epic boon or a little ash; a Chest can be an ambush; the Ember Forges below the second Lock
+export async function rooms() {
+  const results = [];
+  const R = await import('../src/run.js');
+  const { damage: hurt } = await import('../src/combat.js');
+  const enter = async (kind, roll) => {
+    await toTitle();
+    press(0);
+    await waitFor('play');
+    W.player.maxHp = W.player.hp = 99999;
+    W.run.depth = 3;
+    const d = W.room.doors[0];
+    Object.assign(d, { kind, reward: kind, locked: false, patron: null });
+    W.room.openDoors();
+    d.open = true;
+    const rnd = Math.random;
+    if (roll != null) Math.random = () => roll;
+    await goDoor(d);
+    Math.random = rnd;
+  };
+  // kills give XP; a level-up menu would open once the room clears, so those levels are dropped here
+  const clear = () => { for (let i = 0; i < 40 && !W.room.cleared; i++) { for (const e of W.enemies.filter((x) => !x.dead)) damage(e, 1e6, e.pos); W.run.pendingLevels = 0; step(0.5); } };
+  const die = () => { W.player.lives = 0; W.player.hp = 0; W.player.dead = true; step(3); };
+
+  await toTitle();
+  press(0);
+  await waitFor('play');
+  const signs = W.room.doors.filter((d) => d.sign);
+  check(results, 'door signs sit on the door, not above it', signs.length > 0 && signs.every((d) => d.sign.position.y > 1 && d.sign.position.y < 2), signs.map((d) => d.sign.position.y).join(','));
+  die();
+
+  await enter('trial', 0.1); // the take-no-hits trial
+  check(results, 'a Trial names its condition', W.room.plan.kind === 'trial' && W.run.trial?.id === 'untouched' && /Take no hits/.test(document.querySelector('#banner p').textContent));
+  clear();
+  check(results, 'passing a Trial pays an Epic boon', W.room.pickups.some((k) => k.type === 'boon' && k.epic), W.room.pickups.map((k) => k.type).join(','));
+  die();
+
+  await enter('trial', 0.1);
+  step(1.2);
+  W.player.invuln = 0;
+  hurt(W.player, 5, null, { source: W.enemies.find((e) => !e.dead) });
+  step(0.3); // the hit-stop holds the HUD for a few frames
+  check(results, 'a hit fails it, and the HUD says so', /FAILED/.test(document.querySelector('#hud .depth').textContent));
+  clear();
+  check(results, 'failing pays a little ash instead', W.room.pickups.some((k) => k.type === 'ash') && !W.room.pickups.some((k) => k.type === 'boon'));
+  die();
+
+  await enter('chest');
+  const ch = W.room.chest;
+  check(results, 'a Chest room has a chest and open doors', !!ch && W.room.cleared && W.room.doors.every((d) => d.open || d.locked));
+  W.player.pos.copy(ch.pos).add(new THREE.Vector3(1, 0, 1));
+  step(0.1);
+  const rnd = Math.random;
+  Math.random = () => 0.9; // the ambush
+  press(5);
+  Math.random = rnd;
+  step(1.5);
+  check(results, 'an ambush shuts the doors on a wave', ch.opened && !W.room.cleared && W.room.doors.every((d) => !d.open) && W.enemies.some((e) => !e.dead));
+  clear();
+  check(results, 'surviving it pays a Keystone and ash', ['pom', 'bigash'].every((t) => W.room.pickups.some((k) => k.type === t)), W.room.pickups.map((k) => k.type).join(','));
+  die();
+
+  const foes = R.makePlan(24, 'combat').waves.flat();
+  check(results, 'the Ember Forges lie below the second Lock', R.biomeFor(21).name === 'The Ember Forges' && R.biomeFor(29).name === 'The Crucible' && R.regionOf(31) === 'dry');
+  check(results, 'the furnace dead fight there, and the Forgemaster waits at 29', foes.some((t) => ['cinderling', 'smelter', 'anvilback'].includes(t)) && !foes.includes('grunt') && R.makePlan(29, 'boss').waves[0][0] === 'forgemaster');
   return results;
 }

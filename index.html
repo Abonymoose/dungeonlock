@@ -209,6 +209,11 @@
   .pcard h3 { margin: 0 0 0.5em; font-size: 1.1em; font-weight: normal; color: var(--sand); }
   .pcard p { margin: 0; font-size: 0.62em; line-height: 1.7; color: var(--oak); }
   .pcard .done { margin-top: 0.6em; color: var(--sand); }
+  /* five cards share the row, narrowing to fit */
+  .pcards { flex-wrap: nowrap; width: 100%; }
+  .pcard { flex: 0 1 calc(var(--u) * 92); min-width: 0; }
+  .pcard.daily .art img { filter: hue-rotate(-25deg) saturate(1.4) brightness(0.9); }
+  .pcard .board { margin: 0.6em 0 0; padding-left: 1.4em; font-size: 0.6em; line-height: 1.7; color: var(--sand); }
   .padlock {
     position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 1;
     width: calc(var(--u) * 16); height: calc(var(--u) * 16); background: var(--choc);

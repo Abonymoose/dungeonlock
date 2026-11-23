@@ -35,33 +35,37 @@ const classEntry = (c, img) => entry(c.name, `
 const foe = (e, growth) => entry(e.boss ? `${e.name}, ${e.title}` : e.name, `<p>${e.about}</p><p class="stat">${e.boss ? 'Boss. ' : ''}Base health ${e.hp}, ${growth}</p>`, e.boss ? 'var(--crimson)' : null, 'enemy-' + e.id);
 const dungeonGrowth = (e) => `rising with depth.${e.boss ? '' : ' Elites are bigger, armored and tinted crimson.'}`;
 const foes = (ids, growth) => BESTIARY.filter((e) => ids.includes(e.id)).map((e) => foe(e, typeof growth === 'function' ? growth(e) : growth)).join('');
-const WILDS_FOES = ['zombie', 'crawler', 'bloater', 'gravelord'], STORY_FOES = ['bandit', 'crossbowman', 'guard', 'soldier', 'captain', 'blackknight'];
+const WILDS_FOES = ['zombie', 'crawler', 'bloater', 'gravelord'], STORY_FOES = ['bandit', 'crossbowman', 'guard', 'soldier', 'halberdier', 'captain', 'blackknight'];
 const DUNGEON_FOES = BESTIARY.map((e) => e.id).filter((id) => !WILDS_FOES.includes(id) && !STORY_FOES.includes(id));
 const ELITES = () => entry('Elites', `<p>Bigger, armoured and tinted crimson, more common the deeper you go. Each carries one affix, named over its head as it rises:</p><ul>${Object.values(AFFIXES).map((a) => `<li><b>${a.name}</b>: ${a.about}.</li>`).join('')}</ul>`, 'var(--crimson)');
 
 const DEPTHS = [
-  ['The Keep', 'Where every Dungeon run starts and ends: the last dry room above the dungeon. The Anvil is in the corner; the gate takes you to class select and down.', 'keep'],
+  ['The Keep', 'Where every Dungeon run starts and ends: the last dry room above the dungeon. The Anvil is in one corner. The vow altar is in the other: swear vows (faster foes, tougher foes, no healing, no Last Breath, more elites, or taking more damage) and every Dungeon run pays more ash, up to +115% with all six; the gate takes you to class select and down.', 'keep'],
   ['The Cells', 'Depths 1 and 2 of every ten. Warm stone and orange torchlight.', 'cells'],
   ['The Crypt', 'Depths 3 to 5. Cold blue fire and great stone slabs.', 'crypt'],
   ['The Rot', 'Depths 6 to 8. Green light, broken floors and rubble everywhere.', 'rot'],
   ["The Warden's Halls", 'A boss waits at depth 9: the Warden, the Hollow Prior or the Reaver, chosen at random. The Lock comes after: pay one key to escape, or take a door and go deeper.', 'halls'],
-  ['The Sunken Vaults', 'Below the first Lock the stairs run into water: depths 11 to 18, and every other ten after that. Sea-green fire and standing water, and the drowned in place of the dry dead.', 'vaults'],
-  ['The Drowned Throne', 'Depth 19, where the Drowned King waits. Past him, the Lock again. The dungeon goes on for ever, each ten depths harder than the last.', 'throne'],
+  ['The Sunken Vaults', 'Below the first Lock the stairs run into water: depths 11 to 18. Sea-green fire and standing water, and the drowned in place of the dry dead.', 'vaults'],
+  ['The Drowned Throne', 'Depth 19, where the Drowned King waits. Past him, the Lock again.', 'throne'],
+  ['The Ember Forges', 'Below the second Lock the dungeon runs hot: depths 21 to 28. Molten light and slag pools, worked by cinderlings that burst when they die, smelters that throw molten iron, and armoured anvilbacks.', 'forge'],
+  ['The Crucible', 'Depth 29, where the Forgemaster waits. Past him, the Lock again, and the three regions start over: each ten depths harder than the last.', 'crucible'],
 ];
 const BIOMES = [
   ...DEPTHS,
-  ['The Swordsmith', "Adventure mode: a story in six chapters, from your village down the King's Road, through the castle wall, courtyard and great hall, to the Black Knight at the top of the tower. No magic: Attack is one swing that lands a moment after you start it, and Dash is one quick step the way you move. Coin and iron from the men you beat buy a better blade and mail at your forge between chapters. Every chapter start is saved; falling sends you back to it.", 'adventure'],
-  ['The Wilds', 'The Open World mode: a huge island of meadow, forest, rock and lakes. Press Use by trees, rocks and bushes for wood, stone and fiber, and Tab, C or the View button to craft campfires, barricades, bandages and whetstones. Zombies rise every night and burn at dawn, and each dawn brings a boon.', 'wilds'],
+  ['The Swordsmith', "Adventure mode: a story in eight chapters, from your village down the King's Road, through the castle wall, courtyard and great hall, to the Black Knight at the top of the tower. No magic: Attack is one swing that lands a moment after you start it, and Dash is one quick step the way you move. Coin and iron from the men you beat buy a better blade and mail at your forge between chapters. Every chapter start is saved; falling sends you back to it.", 'adventure'],
+  ['The Wilds', 'The Open World mode: a huge island of meadow, forest, rock and lakes. Press Use by trees, rocks and bushes for wood, stone and fiber, and Tab, C or the View button to craft campfires, barricades, bandages and whetstones. Zombies rise every night and burn at dawn, and each dawn brings a boon. Every third night is a Blood Moon: a red sky, more dead and more elites, and every kill pays double ash.', 'wilds'],
 ];
 const biome = ([n, t, id]) => entry(n, `<p>${t}</p>`, null, 'biome-' + id, true);
 // what can wait behind a door
 const ROOMS = () => entry('Rooms', `<p>Each door shows what waits behind it.</p><dl>
-  <dt>Fights</dt><dd>Clear the room for the reward over the door: a patron's boon, ash, a key, healing or a Keystone.</dd>
+  <dt>Fights</dt><dd>Clear the room for the reward shown on the door: a patron's boon, ash, a key, healing or a Keystone.</dd>
   <dt>Elite rooms</dt><dd>From depth 3: tougher fights, with brutes and more elites, for a better reward.</dd>
   <dt>Fountains</dt><dd>From depth 2: drink to heal half your health. No fight.</dd>
   <dt>Vaults</dt><dd>Locked: spend a key for a boon and healing, no fight.</dd>
   <dt>The Peddler</dt><dd>From depth 3: a hooded trader who sells healing, keys, boons, Keystones and max health for the ash you carry this run. Each once per visit.</dd>
   <dt>Shrines</dt><dd>From depth 4: strike one bargain. Blood Price trades max health for an Epic boon; Iron Debt and Glass Pact pay up front, then make the next three fights harder.</dd>
+  <dt>Trials</dt><dd>From depth 3, crossed blades on the door: a fight with a condition, named as you walk in. Take no hits, or clear it before the time runs out. Pass for an Epic boon; fail and you get a little ash.</dd>
+  <dt>Chests</dt><dd>From depth 2: a room with one chest and no fight. Open it for a heap of ash and a key, or it is an ambush: the doors shut on a wave of elites, and surviving pays a Keystone and more ash. You can always walk past it.</dd>
   <dt>The Lock</dt><dd>Every tenth depth: pay a key to escape with your ash, or go deeper.</dd>
 </dl>`);
 
@@ -88,7 +92,8 @@ const SECTIONS = [
 
   () => entry('The Anvil', `<p>Spend ash between runs, at the Anvil in the Keep. These last forever.</p><ul>${UPGRADES.map((u) => `<li><b>${u.name}</b>: ${u.desc} (up to ${u.max})</li>`).join('')}</ul>`)
     + entry('Level-up perks', `<p>Kills give XP. Each level lets you pick one of three perks once the room is clear.</p><ul>${PERKS.map((k) => `<li><b>${k.name}</b>: ${k.desc}</li>`).join('')}</ul>`)
-    + HARDCORE(),
+    + HARDCORE()
+    + entry('Daily Run', '<p>On the Play menu. One dungeon a day, the same for everyone: the day picks the class, the vow and the seed, everyone gets the first weapon, and the Anvil stays switched off. Your score is depth times 100, plus kills, plus 500 for escaping through a Lock; your best one each day goes on the shared board.</p>'),
 
   () => feats(true),
 
@@ -127,7 +132,7 @@ export const MODES = [
   },
   {
     id: 'adventure', name: 'Adventure', art: 'card-adventure',
-    intro: 'A story in six chapters. You are a village swordsmith, the castle has fallen to a black knight, and the princess is locked in the tower. No magic: one sword, and the mail you forge yourself.',
+    intro: 'A story in eight chapters. You are a village swordsmith, the castle has fallen to a black knight, and the princess is locked in the tower. No magic: one sword, and the mail you forge yourself.',
     parts: [
       ['The swordsmith', () => classEntry(SMITH, null) + biome(BIOMES[DEPTHS.length])],
       ['Chapters', () => entry('The road to the tower', `<p>Every chapter start is saved. Fall, and you go back to the start of that chapter with your forge work kept.</p><ol>${CHAPTERS.map((c) => `<li><b>${c.title}</b>: ${c.sub}</li>`).join('')}</ol>`)],

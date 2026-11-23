@@ -133,7 +133,7 @@ export async function all() {
   W.player.hp = 0; W.player.dead = true;
   T.step(2);
   await T.toPlayMenu();
-  T.clickSel(3); // Tutorial
+  T.clickSel(4); // Tutorial
   await T.waitFor('play');
   for (let i = 0; i < 50 && !W.tutorial; i++) await T.sleep(100);
   T.step(1.2);
@@ -348,6 +348,28 @@ export async function portraits(types, depth = 4) {
     out.push(await shot('enemy-' + type, e.pos, { zoom: 2.4 / big, w: 120, h: 132, lift: 0.6 * big }));
   }
   W.player.hp = 0; W.player.dead = true;
+  T.step(3);
+  return out;
+}
+
+// Pictures of regions added later.  Run:  await S.biomeShots([['forge', 22, 'combat'], ['crucible', 29, 'boss']]);
+export async function biomeShots(list) {
+  const out = [];
+  await T.toTitle();
+  T.press(0);
+  await T.waitFor('play');
+  W.player.maxHp = W.player.hp = 9999;
+  W.player.lives = 99;
+  for (const [name, depth, kind] of list) {
+    await visit(depth, kind);
+    for (const e of W.enemies) { e.hp = 0; e.dead = true; }
+    W.pendingSpawns = 0;
+    T.step(2);
+    W.player.pos.copy(W.room.center).add({ x: 1.2, y: 0, z: 1.2 });
+    T.step(0.2);
+    out.push(await shot('biome-' + name, W.room.center, { zoom: 1 }));
+  }
+  W.player.lives = 0; W.player.hp = 0; W.player.dead = true;
   T.step(3);
   return out;
 }

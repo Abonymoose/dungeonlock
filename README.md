@@ -18,9 +18,9 @@ It works with a keyboard and mouse, with a controller, or on a phone held sidewa
 <td width="33%"><img src="assets/shots/card-adventure.png" alt="The swordsmith at the castle gate at dusk"></td>
 </tr>
 <tr>
-<td valign="top"><b>The Dungeon</b><br>Start in the Keep, pick one of five classes (Knight, Rogue, Wizard, Barbarian, Necromancer) and one of their three weapons, and descend. Seven patrons offer boons for your moves, each with its own status: Burn, Chill, Corrode, Hex, Shock, Doom and Mark. A boss waits at depth 9, and the Lock after it needs a key. Below the first Lock the dungeon floods into the Sunken Vaults, ruled by the Drowned King. Elites carry affixes. Spend run ash at the Peddler, or strike a bargain at a Shrine. Ash from each run buys lasting upgrades and new weapons, and Feats pay out more.</td>
-<td valign="top"><b>The Wilds</b> (beta)<br>A huge island of meadow, forest, rock and lakes. Gather wood, stone and fiber by day and craft campfires, torches, barricades, spike traps, stew and more. When night falls, the dead rise, and every fifth night brings the Grave Lord.</td>
-<td valign="top"><b>Adventure</b><br>Six chapters as a village swordsmith with no magic, only one sword. Go from your forge, down the King's Road and into the castle to fight the Black Knight and rescue the princess. Each chapter start is saved.</td>
+<td valign="top"><b>The Dungeon</b><br>Start in the Keep, pick one of five classes (Knight, Rogue, Wizard, Barbarian, Necromancer) and one of their three weapons, and descend. Seven patrons offer boons for your moves, each with its own status: Burn, Chill, Corrode, Hex, Shock, Doom and Mark. A boss waits at depth 9, and the Lock after it needs a key. Below the first Lock the dungeon floods into the Sunken Vaults, ruled by the Drowned King. Below the second Lock the Ember Forges burn, ruled by the Forgemaster. Elites carry affixes. Spend run ash at the Peddler, strike a bargain at a Shrine, take on a Trial, or gamble on a Chest. Swear Vows in the Keep for harder runs and more ash, or play the Daily Run and post your score to the shared board. Ash from each run buys lasting upgrades and new weapons, and Feats pay out more.</td>
+<td valign="top"><b>The Wilds</b> (beta)<br>A huge island of meadow, forest, rock and lakes. Gather wood, stone and fiber by day and craft campfires, torches, barricades, spike traps, stew and more. When night falls, the dead rise. Every third night is a Blood Moon, and every fifth brings the Grave Lord.</td>
+<td valign="top"><b>Adventure</b><br>Eight chapters as a village swordsmith with no magic, only one sword. Go from your forge, down the King's Road and into the castle to fight the Black Knight and rescue the princess. Each chapter start is saved.</td>
 </tr>
 </table>
 
@@ -65,7 +65,7 @@ src/
   touch.js        on-screen phone controls
   keep.js         the Keep between runs: the Anvil and the gate
   feats.js        Feats: one-time goals that pay ash
-  shop.js         the Peddler's wares and the Shrine's bargains
+  shop.js         the Peddler's wares, the Shrine's bargains and the Chest room
   classes.js      the five classes, their weapons, and the Swordsmith
   enemies.js      every enemy and boss, and their AI
   combat.js       hits, projectiles, telegraphs and effects
@@ -103,6 +103,7 @@ await T.shrine();         // a Shrine's bargain
 await T.dodge();          // perfect dodges
 await T.graveLord();      // the Wilds' boss night
 await T.patrons();        // Knell's Doom, Vigil's Mark, the boon screens, and patron doors
+await T.rooms();          // door signs, Trials, Chests and the Ember Forges
 await T.saves();
 await T.settingsCheck();
 ```
@@ -110,6 +111,10 @@ await T.settingsCheck();
 Each test returns a list of `PASS` and `FAIL` lines.
 
 To rebuild the wiki after changing game data, run `await (await import('/test/shots.js')).buildWiki()` in the same console.
+
+## The daily leaderboard
+
+`server/scores.js` is a Cloudflare Worker at https://dungeonscores.dungeonlock.workers.dev with a D1 database (`dungeonscores`). `GET /daily` returns today's top ten; `POST /daily` keeps each name's best score for the day. It only checks that a score is within sane bounds, so it is a casual board, not a cheat-proof one.
 
 ## Deploying
 

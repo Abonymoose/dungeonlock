@@ -10,7 +10,7 @@ import { occludes } from './run.js';
 import { sfx, musicFor } from './audio.js';
 
 const clamp = THREE.MathUtils.clamp;
-const ICON = { key: 'key', heal: 'heal', boon: 'boon', ash: 'ash', treasure: 'boon', boss: 'skull', exit: 'key', pom: 'pom', shop: 'ash', shrine: 'skull' };
+const ICON = { key: 'key', heal: 'heal', boon: 'boon', ash: 'ash', treasure: 'boon', boss: 'skull', exit: 'key', pom: 'pom', shop: 'ash', shrine: 'skull', trial: 'trial', chest: 'chest' };
 const rand = (a) => a[Math.floor(Math.random() * a.length)];
 const key = (x, z) => `${x},${z}`;
 
@@ -224,7 +224,7 @@ export function buildRoom(plan, doorPlans) {
     room.traps.push({ x, z, plate, spikes, t: (CYCLE - set * 0.9) % CYCLE, hit: new Set() });
   }
 
-  // ---- doorways: gated until opened, a lock if keyed, the reward floating above ----
+  // ---- doorways: gated until opened, a lock if keyed, the reward on a plaque on the door itself ----
   for (const d of doors) {
     const rot = d.wall === 'z' ? 0 : Math.PI / 2, ox = d.wall === 'z' ? d.pos.x : d.pos.x - 0.25, oz = d.wall === 'z' ? d.pos.z - 0.25 : d.pos.z;
     d.gated = place(prop('wall_gated'), ox, 0, oz, rot, group);
@@ -242,9 +242,15 @@ export function buildRoom(plan, doorPlans) {
     }
     const iconType = d.patron ? PATRONS[d.patron].color : ICON[d.reward ?? d.kind];
     if (iconType) {
+      d.sign = new THREE.Group();
+      place(new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.05), toon(C.CHOC)), 0, 0, 0, 0, d.sign);
+      place(new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.66, 0.06), toon(C.ONYX)), 0, 0, 0.01, 0, d.sign);
       d.icon = makeIcon(iconType).root;
-      d.icon.position.set(0, 2.35, 0.3);
-      g.add(d.icon);
+      d.icon.position.set(0, -0.35 * 0.8, 0.14); // makeIcon centres its shape 0.35 up
+      d.icon.scale.setScalar(0.8);
+      d.sign.add(d.icon);
+      d.sign.position.set(0, 1.62, 0.12);
+      g.add(d.sign);
     }
     d.open = false;
     group.add(g);
@@ -365,6 +371,7 @@ function attachLogic(room) {
     if (closed.length) sfx('door');
     closed.forEach(swing);
   };
+  room.closeDoors = () => { for (const d of room.doors) if (d.open) { d.open = false; d.gated.visible = true; d.open_.visible = false; } };
   room.unlock = (d) => { d.locked = false; d.lock?.removeFromParent(); swing(d); sfx('unlock'); };
   room.doorNear = (pos, range = 1.3) => room.doors.find((d) => d.pos.distanceTo(pos) < range) ?? null;
 
@@ -379,7 +386,7 @@ function attachLogic(room) {
 
   room.update = (dt) => {
     for (const d of room.doors) {
-      if (d.icon) { d.icon.position.y = 2.35 + Math.sin(world.time * 3) * 0.08; d.icon.rotation.y += dt * 1.5; }
+      if (d.icon) d.icon.rotation.y = Math.sin(world.time * 1.5) * 0.5; // sways on its plaque
     }
     for (const p of room.pickups) {
       p.t += dt;

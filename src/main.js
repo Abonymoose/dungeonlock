@@ -8,9 +8,9 @@ import { startTutorial, updateTutorial } from './tutorial.js';
 import { TABS, codexBody } from './codex.js';
 import { CLASSES, CAST, WEAPONS, owns, equipped, armed, createPlayer, updatePlayer } from './classes.js';
 import { spawnEnemy, updateEnemies, updateAllies, clearAllies, bossOf, TYPES } from './enemies.js';
-import { updateCombat, clearCombat, heal, floatText } from './combat.js';
+import { updateCombat, clearCombat, heal, floatText, burst } from './combat.js';
 import { buildRoom } from './room.js';
-import { makePlan, rollDoors, rollPerks, xpToNext, meta, saveMeta, UPGRADES } from './run.js';
+import { makePlan, rollDoors, rollWaves, rollPerks, xpToNext, meta, saveMeta, UPGRADES, MAX_PATRONS } from './run.js';
 import { PATRONS, RARITY, SLOT_NAME, BOONS, offerBoons, takeBoon, describe, value, slotIcons } from './boons.js';
 import { disposeObject } from './models.js';
 import * as ui from './ui.js';
@@ -20,11 +20,54 @@ import { makeWild, buildWild, wildUpdate, RECIPES, canCraft, craft, costText } f
 import { CHAPTERS, ENDING, FORGE, chapterPlan, adventureUpdate, canForge, forgeCost, forge, applyForge, newAdventure } from './adventure.js';
 import { makePrincess } from './models.js';
 import { updateTouch } from './touch.js';
-import { keepPlan, furnishKeep, keepUpdate } from './keep.js';
+import { keepPlan, furnishKeep, keepUpdate, VOWS, sworn, vowBonus } from './keep.js';
 import { earn } from './feats.js';
-import { WARES, priceOf, furnishShop, BARGAINS, furnishShrine } from './shop.js';
+import { WARES, priceOf, furnishShop, BARGAINS, furnishShrine, furnishChest } from './shop.js';
 
 const CLASS_IDS = Object.keys(CLASSES);
+
+// ---- the Daily Run: one dungeon a day, the same class and vow for everyone, best scores on a shared board ----
+const SCORES = 'https://dungeonscores.dungeonlock.workers.dev/daily';
+const realRandom = Math.random;
+const todayUTC = () => new Date().toISOString().slice(0, 10);
+const dayNumber = (day) => Math.floor(Date.parse(day) / 864e5);
+const seeded = (seed) => () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+const dailyRules = (day = todayUTC()) => { const n = dayNumber(day); return { day, cls: CLASS_IDS[n % CLASS_IDS.length], vow: VOWS[n % VOWS.length].id }; };
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+let board = null; // today's top ten, fetched when the Play menu opens
+async function loadBoard() {
+  try { board = (await fetch(`${SCORES}?day=${todayUTC()}`).then((r) => r.json())).top ?? []; } catch { board = null; }
+  if (world.state === 'playmenu') RENDER.playmenu();
+}
+function dailyInfo() {
+  const d = dailyRules();
+  return { cls: CLASSES[d.cls].name, vow: VOWS.find((v) => v.id === d.vow).name,
+    board: board?.slice(0, 5).map((b) => `${esc(b.name)} <span class="dim">${b.score}</span>`) ?? null };
+}
+function startDaily() {
+  const d = dailyRules();
+  menu.mode = 'dungeon';
+  menu.cls = CLASS_IDS.indexOf(d.cls);
+  menu.look = { [d.cls]: 0 }; // everyone gets the class's first weapon
+  // shortcut: this seeds all of the game's randomness for the run, so rooms, doors and boons start the same for
+  // everyone, then drift apart with how each player fights. Seed only the run's own rolls if that ever matters.
+  Math.random = seeded(dayNumber(d.day) * 7919);
+  startRun(d);
+}
+async function postDaily(run, kind) {
+  const score = run.depth * 100 + run.kills + (kind === 'escaped' ? 500 : 0);
+  let name = meta.name;
+  if (!name) {
+    name = (window.prompt('Your name for the daily board (up to 16 letters):') ?? '').trim().slice(0, 16);
+    if (name) { meta.name = name; saveMeta(); }
+  }
+  if (!name) return ui.toast(`<b>DAILY: ${score} POINTS</b><span>No name given, so it was not posted.</span>`);
+  try {
+    const r = await fetch(SCORES, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ day: run.daily.day, name, score, depth: run.depth, cls: run.daily.cls }) }).then((x) => x.json());
+    ui.toast(r.ok ? `<b>DAILY: ${score} POINTS</b><span>Rank ${r.rank} today, as ${esc(name)}.</span>` : `<b>DAILY: NOT POSTED</b><span>${esc(r.error)}</span>`);
+  } catch { ui.toast('<b>DAILY: OFFLINE</b><span>Your score could not be posted.</span>'); }
+  board = null;
+}
 let hadPad = false;
 const menu = { home: 0, play: 0, cls: 0, anvil: 0, boon: 0, choice: null, pause: 0, set: 0, tab: 0, over: 0, click: false, look: {} };
 const BANNERS = {
@@ -35,10 +78,11 @@ const BANNERS = {
   fountain: ['FOUNTAIN', 'Drink, and go on.'],
   shop: ['THE PEDDLER', 'Spend your ash. It will not save you down here.'],
   shrine: ['THE SHRINE', 'The Lock will deal, for a price.'],
+  chest: ['A CHEST', 'Locked tight. Something rattles inside.'],
   exit: ['THE LOCK', 'One key, one way out. Or go deeper.'],
   wild: ['THE WILDS', 'Gather by day. Survive the night.'],
 };
-const REWARD_NAME = { boon: 'Boon', ash: 'Ash', key: 'Key', heal: 'Healing', pom: 'Keystone', shop: 'The Peddler', shrine: 'A Bargain' };
+const REWARD_NAME = { boon: 'Boon', ash: 'Ash', key: 'Key', heal: 'Healing', pom: 'Keystone', shop: 'The Peddler', shrine: 'A Bargain', trial: 'A Trial', chest: 'A Chest' };
 
 // ---- world setup ----
 
@@ -79,13 +123,14 @@ async function enterMenu(state) {
 
 // Hardcore leaves the Anvil's help at home (Greed still pays out)
 const NO_UPGRADES = { vitality: 0, whetstone: 0, lastbreath: 0, shards: 0, quickstep: 0, favor: 0, insight: 0, sparekey: 0 };
-const anvil = () => (settings.hardcore ? NO_UPGRADES : meta);
+const anvil = () => (settings.hardcore || world.run?.daily ? NO_UPGRADES : meta); // the Daily Run is the same for everyone
 
-function startRun() {
-  world.run = { depth: 0, keys: anvil().sparekey ? 1 : 0, ash: 0, kills: 0, boons: [], keyDoorsSeen: 0, xp: 0, level: 1, pendingLevels: 0, rerolls: anvil().insight, t0: world.time, featsAtStart: Object.keys(meta.feats ?? {}).length };
+function startRun(daily = null) {
+  world.run = { depth: 0, keys: anvil().sparekey ? 1 : 0, ash: 0, kills: 0, boons: [], keyDoorsSeen: 0, xp: 0, level: 1, pendingLevels: 0, rerolls: anvil().insight, t0: world.time, featsAtStart: Object.keys(meta.feats ?? {}).length,
+    vows: daily ? [daily.vow] : menu.mode === 'open' ? [] : [...(meta.vows ?? [])], daily };
   ui.hideScreen();
   newPlayer();
-  world.player.lives = anvil().lastbreath;
+  world.player.lives = sworn(world.run, 'forsworn') ? 0 : anvil().lastbreath;
   ui.setSlots([]);
   enterRoom(menu.mode === 'open' ? makeWild() : makePlan(0, 'start'));
 }
@@ -102,6 +147,10 @@ async function enterRoom(plan) {
   if (plan.kind === 'keep') furnishKeep(room);
   if (plan.kind === 'shop') furnishShop(room);
   if (plan.kind === 'shrine') furnishShrine(room);
+  if (plan.kind === 'chest') furnishChest(room);
+  // a Trial names its condition as you walk in; pass it for an Epic boon
+  world.run.trial = plan.kind === 'trial' ? pick(TRIALS(plan)) : null;
+  if (world.run.trial) plan.banner = ['TRIAL', world.run.trial.desc];
   world.run.hurt = false;
   dungeonFeats(false);
   const p = world.player;
@@ -116,7 +165,7 @@ async function enterRoom(plan) {
 
   if (!plan.waves.length) room.cleared = true;
   if (plan.kind === 'vault') { room.addPickup('boon', room.center.x - 1.2, room.center.z, plan.patron); room.addPickup('heal', room.center.x + 1.2, room.center.z); }
-  if (['start', 'fountain', 'exit', 'vault', 'keep', 'shop', 'shrine'].includes(plan.kind)) room.openDoors();
+  if (['start', 'fountain', 'exit', 'vault', 'keep', 'shop', 'shrine', 'chest'].includes(plan.kind)) room.openDoors();
   world.waveDelay = plan.waves.length ? 0.9 : 0;
 
   const reward = plan.patron ? `${PATRONS[plan.patron].name}'s Boon` : REWARD_NAME[plan.reward];
@@ -135,7 +184,9 @@ function endRun(kind) {
   if (world.tutorial) return leaveTutorial(false); // the tutorial never banks or counts as a run
   if (world.adventure) return adventureEnded(kind);
   if (world.run.keep) return enterMenu('playmenu'); // leaving the Keep isn't a run
-  const run = world.run, ash = Math.round((run.ash + (kind === 'escaped' ? 60 : 0)) * (1 + 0.15 * meta.greed));
+  Math.random = realRandom;
+  if (world.run.daily) postDaily(world.run, kind);
+  const run = world.run, ash = Math.round((run.ash + (kind === 'escaped' ? 60 : 0)) * (1 + 0.15 * meta.greed) * (1 + vowBonus(run.vows) / 100));
   meta.ash += ash;
   meta.runs++;
   if (kind === 'escaped') { meta.escapes++; earn('escape'); }
@@ -169,9 +220,78 @@ function spawnWave() {
   for (const type of types) {
     if (TYPES[type].boss) { spawnEnemy(type, room.center.x - 2, room.center.z - 2, room.plan.depth); continue; }
     const { x, z } = room.freeSpot(p.pos, 4.5);
-    const eliteOdds = room.plan.kind === 'elite' ? 0.35 : Math.min(0.5, Math.max(0, room.plan.depth - 4) * 0.03 + (settings.hardcore ? 0.15 : 0));
+    const eliteOdds = (room.plan.kind === 'elite' ? 0.35 : Math.min(0.5, Math.max(0, room.plan.depth - 4) * 0.03 + (settings.hardcore ? 0.15 : 0))) * (sworn(world.run, 'plague') ? 2 : 1);
     spawnEnemy(type, x, z, room.plan.depth, type !== 'brute' && Math.random() < eliteOdds);
   }
+}
+
+// The vow altar: each card swears or breaks one vow, and the screen stays open until you close it
+function openVows(at = 0) {
+  openChoice({
+    header: { name: 'Vows', title: `Sworn vows make Dungeon runs harder and pay more ash. Now: +${vowBonus(meta.vows)}% ash`, css: '#9B1C1C' },
+    items: VOWS, cancel: true,
+    toCard: (v) => ({ kind: meta.vows?.includes(v.id) ? 'SWORN' : 'VOW', name: v.name, desc: v.desc, note: `+${v.bonus}% ash`, css: meta.vows?.includes(v.id) ? '#C8463C' : '#6E5050' }),
+    onPick: (v) => {
+      const on = meta.vows?.includes(v.id);
+      meta.vows = on ? meta.vows.filter((x) => x !== v.id) : [...(meta.vows ?? []), v.id];
+      saveMeta();
+      sfx(on ? 'menu' : 'slam');
+      openVows(VOWS.indexOf(v));
+    },
+  });
+  menu.boon = at;
+  menu.boonDelay = 0.15;
+  renderChoice();
+}
+
+// ---- Trials and Chests ----
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+const TRIALS = (plan) => [
+  { id: 'untouched', desc: 'Take no hits.' },
+  { id: 'swift', desc: `Clear it in ${20 + plan.waves.length * 12} seconds.`, limit: 20 + plan.waves.length * 12, t: 0 },
+];
+// a patron you've met, if any, so the Epic boon builds on what you carry
+const metPatron = () => {
+  const met = [...new Set(world.run.boons.flatMap((id) => BOONS[id].duo ?? [BOONS[id].patron]))];
+  const ids = met.length >= MAX_PATRONS ? met : Object.keys(PATRONS);
+  return pick(met.length && Math.random() < 0.7 ? met : ids);
+};
+function trialFailed() {
+  const t = world.run.trial;
+  return !t || (t.id === 'untouched' ? world.run.hurt : t.t > t.limit);
+}
+function trialReward(room) {
+  const [dx, dz] = room.plan.drop ?? [room.center.x, room.center.z];
+  if (trialFailed()) { ui.showBanner('TRIAL FAILED', 'The Lock gives you something for trying.', 1600); room.addPickup('ash', dx, dz); return; }
+  earn('trial');
+  ui.showBanner('TRIAL PASSED', 'Take an Epic boon.', 1600);
+  room.addPickup('boon', dx, dz, metPatron()).epic = true;
+}
+function openChest(room) {
+  const c = room.chest, depth = room.plan.depth;
+  c.opened = true;
+  c.glow.visible = false;
+  c.model.rotation.x = -0.3;
+  sfx('unlock');
+  if (Math.random() < 0.55) {
+    ui.showBanner('TREASURE', '', 1200);
+    burst(c.pos, 0xf0c040, 14);
+    room.addPickup('bigash', c.pos.x + 1.1, c.pos.z + 0.3);
+    room.addPickup('key', c.pos.x + 0.3, c.pos.z + 1.1);
+    return;
+  }
+  // an ambush: the doors slam, an elite wave rises, and the reward is a Keystone and a heap of ash
+  ui.showBanner('AMBUSH!', 'It was never a chest.', 1400);
+  sfx('slam');
+  world.shake = 0.4;
+  room.closeDoors();
+  room.cleared = false;
+  room.waveIndex = 0;
+  room.plan.waves = rollWaves(Math.max(depth, 3), 'elite').slice(0, 1);
+  room.plan.reward = 'pom';
+  room.plan.drop = [c.pos.x - 1.2, c.pos.z + 1.2]; // not inside the chest
+  world.waveDelay = 0.6;
+  world.run.ambush = true;
 }
 
 function clearRoom() {
@@ -180,6 +300,7 @@ function clearRoom() {
   const c = world.run.curse;
   if (c && room.plan.waves.length && --c.rooms <= 0) { world.run.curse = null; ui.toast(`<b>${c.name.toUpperCase()} PAID</b><span>The Lock is satisfied.</span>`); }
   dungeonFeats(true);
+  if (kind === 'chest') earn('ambush');
   world.slowmo = 0.8; // the last kill lands in slow motion
   ui.showBanner(kind === 'boss' ? TYPES[room.plan.waves[0][0]].name.toUpperCase() + ' FALLS' : 'CLEARED', '', 1400);
   rumble(0.3, 0.3, 120);
@@ -188,6 +309,8 @@ function clearRoom() {
   room.pickups = room.pickups.filter((k) => k.type !== 'shard');
   world.player.ammo = world.player.maxAmmo;
   if (world.adventure && kind === 'boss') return rescue();
+  if (kind === 'trial') return trialReward(room);
+  if (kind === 'chest') room.addPickup('bigash', room.center.x + 1.2, room.center.z - 1.2); // the ambush paid off
   const reward = kind === 'boss' ? 'bigash' : room.plan.reward;
   const [dx, dz] = room.plan.drop ?? [room.center.x, room.center.z]; // a centre pillar moves the drop in front of it
   if (reward) room.addPickup(reward, dx, dz, room.plan.patron);
@@ -201,13 +324,15 @@ function dungeonFeats(cleared) {
   if (depth >= 10) earn('depth10');
   if (depth >= 11) earn('vaults');
   if (depth >= 20) earn('depth20');
+  if (depth >= 21) earn('forges');
   if (depth >= 5 && settings.hardcore) earn('hardcore');
+  if (depth >= 10 && (run.vows?.length ?? 0) >= 3) earn('vowed');
   if (world.player.boons.length >= 6) earn('collector');
   if ((run.dodges ?? 0) >= 10) earn('dodger');
   if (!cleared) return;
   if (room.plan.waves.length) earn('firstblood');
   if (depth >= 5 && room.plan.waves.length && !run.hurt) earn('untouched');
-  if (room.plan.kind === 'boss') earn(room.plan.waves[0][0]); // warden, prior, reaver, drownedking
+  if (room.plan.kind === 'boss') earn(room.plan.waves[0][0]); // warden, prior, reaver, drownedking, forgemaster
 }
 
 function collect(k) {
@@ -220,7 +345,7 @@ function collect(k) {
     const n = type === 'bigash' ? 40 : 10 + run.depth * 2;
     run.ash += n;
     floatText(p.pos, `+${n} ash`, 'ash');
-  } else if (type === 'boon') return openBoon(k.patron ?? Object.keys(PATRONS)[Math.floor(Math.random() * Object.keys(PATRONS).length)]);
+  } else if (type === 'boon') return openBoon(k.patron ?? Object.keys(PATRONS)[Math.floor(Math.random() * Object.keys(PATRONS).length)], !!k.epic);
   else if (type === 'pom') return openKeystone();
   world.room.openDoors();
 }
@@ -390,7 +515,10 @@ function roomLogic(dt) {
   else if (!run.keep && !world.tutorial && room.plan.kind !== 'wild') {
     const left = world.enemies.filter((e) => !e.dead).length + world.pendingSpawns, waves = room.plan.waves.length;
     const debt = run.curse ? `<br><span class="red">${run.curse.name.toUpperCase()} (${run.curse.rooms})</span>` : '';
-    run.label = (room.cleared || !waves ? `DEPTH ${room.plan.depth}` : `DEPTH ${room.plan.depth}<br>${left} LEFT${waves > 1 ? ` &nbsp;WAVE ${Math.max(1, room.waveIndex)} OF ${waves}` : ''}`) + debt;
+    const t = run.trial;
+    if (t && !room.cleared && t.id === 'swift') t.t += dt;
+    const trial = t && !room.cleared ? `<br><span class="${trialFailed() ? 'red' : ''}">TRIAL: ${t.id === 'untouched' ? 'NO HITS' : Math.max(0, Math.ceil(t.limit - t.t)) + 's'}${trialFailed() ? ' FAILED' : ''}</span>` : '';
+    run.label = (room.cleared || !waves ? `DEPTH ${room.plan.depth}` : `DEPTH ${room.plan.depth}<br>${left} LEFT${waves > 1 ? ` &nbsp;WAVE ${Math.max(1, room.waveIndex)} OF ${waves}` : ''}`) + trial + debt;
   }
   if (room.plan.kind === 'field') {
     const f = adventureUpdate(room);
@@ -398,7 +526,8 @@ function roomLogic(dt) {
     wildPrompt = f.prompt;
   }
   if (room.plan.kind === 'keep') {
-    const k = keepUpdate(room, p);
+    const k = keepUpdate(room, p, dt);
+    if (k.vows) return openVows();
     wildPrompt = k.prompt;
     if (k.anvil) { menu.anvilFrom = 'keep'; return enterMenu('anvil'); }
   }
@@ -407,6 +536,7 @@ function roomLogic(dt) {
     wildPrompt = w.prompt;
     if (w.dawn) {
       if (run.wild.nights >= 5) earn('nights');
+      if (run.wild.survivedBlood) earn('bloodmoon');
       ui.showBanner('DAWN', `You lived through night ${run.wild.nights}. Take a gift.`, 1800);
       return openBoon(Object.keys(PATRONS)[Math.floor(Math.random() * Object.keys(PATRONS).length)]);
     }
@@ -449,6 +579,14 @@ function roomLogic(dt) {
       if (pressed('interact')) return openShrine();
     }
   }
+  const ch = room.chest;
+  if (ch && !ch.opened) {
+    ch.glow.position.y = 1.3 + Math.sin(performance.now() / 300) * 0.08;
+    if (ch.pos.distanceTo(p.pos) < 1.8) {
+      prompt = `${btn('interact')}OPEN THE CHEST`;
+      if (pressed('interact')) openChest(room);
+    }
+  }
   const sh = room.shop;
   if (sh) {
     sh.model.anim.update(dt);
@@ -480,7 +618,7 @@ const ACTION_NAME = { attack: 'Attack', special: 'Special', cast: 'Cast', dash: 
 const SEL_KEY = { home: 'home', playmenu: 'play', title: 'cls', anvil: 'anvil', choice: 'boon', pause: 'pause', settings: 'set', over: 'over' };
 const RENDER = {
   home: () => ui.homeScreen(menu.home, meta),
-  playmenu: () => ui.playScreen(menu.play, meta),
+  playmenu: () => { if (board === null) { board = []; loadBoard(); } return ui.playScreen(menu.play, meta, dailyInfo()); },
   title: () => ui.titleScreen(CLASS_IDS.map((id, i) => {
     const w = i === menu.cls ? shownWeapon() : equipped(id, meta);
     return { ...armed(id, w), owned: owns(meta, w), count: WEAPONS[id].length, at: WEAPONS[id].indexOf(w) };
@@ -753,12 +891,13 @@ const STATES = {
   },
 
   playmenu() {
-    if (navigate('play', 4, true)) return RENDER.playmenu();
+    if (navigate('play', ui.PLAY_CARDS.length, true)) return RENDER.playmenu();
     if (pressed('back')) return show('home');
     if (!confirmed()) return;
     const card = ui.PLAY_CARDS[menu.play];
     if (card === 'tutorial') return beginTutorial();
     if (card === 'adventure') return startAdventure();
+    if (card === 'daily') return startDaily();
     menu.mode = card === 'open' ? 'open' : 'dungeon';
     if (menu.mode === 'dungeon') return enterKeep();
     menu.titleFrom = 'playmenu';

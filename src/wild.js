@@ -317,13 +317,15 @@ const NITE = { sky: new THREE.Color(0x2a3868), ground: new THREE.Color(0x090c14)
 const tc = new THREE.Color();
 // 1 by day, 0 at night, easing through dusk and dawn
 const daylight = (t) => (t < DUSK ? 1 : t < NIGHT ? 1 - (t - DUSK) / (NIGHT - DUSK) : t < DAWN ? 0 : (t - DAWN) / (1 - DAWN));
-function sky(t) {
-  const k = daylight(t), mix = (a, b) => tc.copy(a).lerp(b, k).getHex(), lerp = (a, b) => a + (b - a) * k;
+function sky(t, blood) {
+  const k = daylight(t), mix = (a, b) => tc.copy(a).lerp(b, k).getHex(), lerp = (a, b) => a + (b - a) * k, N = blood ? BLOOD : NITE;
   setMood({
-    sky: mix(NITE.sky, DAY.sky), ground: mix(NITE.ground, DAY.ground), sun: mix(NITE.sun, DAY.sun),
-    amb: lerp(NITE.amb, DAY.amb), sunI: lerp(NITE.sunI, DAY.sunI), grade: NITE.grade.map((v, i) => lerp(v, DAY.grade[i])),
+    sky: mix(N.sky, DAY.sky), ground: mix(N.ground, DAY.ground), sun: mix(N.sun, DAY.sun),
+    amb: lerp(N.amb, DAY.amb), sunI: lerp(N.sunI, DAY.sunI), grade: N.grade.map((v, i) => lerp(v, DAY.grade[i])),
   });
 }
+// a Blood Moon night: the same dark, washed red
+const BLOOD = { ...NITE, sky: new THREE.Color(0x5a1414), ground: new THREE.Color(0x200808), sun: new THREE.Color(0xd06060), grade: [1.0, 0.62, 0.6] };
 
 // Runs every frame of play in the Wilds. Returns the prompt to show and whether dawn just broke.
 export function wildUpdate(dt) {
@@ -335,31 +337,35 @@ export function wildUpdate(dt) {
   if (before < NIGHT && w.clock >= NIGHT) {
     w.nights++;
     // every fifth night the Grave Lord digs up as well
+    w.blood = w.nights % 3 === 0 && w.nights % 5 !== 0;
     if (w.nights % 5 === 0) {
       const at = room.freeSpot(p.pos, 8, 12);
       spawnEnemy('gravelord', at.x, at.z, 1 + w.nights * 2);
       ui.showBanner('THE GRAVE LORD', `Night ${w.nights}. Something huge is digging its way up.`, 2400);
-    } else ui.showBanner(`NIGHT ${w.nights}`, 'They rise. Stay near a fire.', 1800);
+    } else if (w.blood) ui.showBanner('BLOOD MOON', `Night ${w.nights}. More of them, and angrier. Every kill pays double ash.`, 2400);
+    else ui.showBanner(`NIGHT ${w.nights}`, 'They rise. Stay near a fire.', 1800);
     sfx('slam');
   }
   if (before < DAWN && w.clock >= DAWN) {
     // the sun burns the dead back into the ground
     for (const e of world.enemies) if (!e.dead) { floatText(e.pos, 'BURNS', 'burn'); burst(e.pos, 0xffa040, 10); e.hp = 0; e.dead = true; e.burned = true; e.onDeath(); }
     run.depth = w.nights;
+    w.survivedBlood = w.blood;
+    w.blood = false;
     dawn = true;
   }
-  sky(w.clock);
+  sky(w.clock, w.blood);
 
   if (night) {
     w.spawnT -= dt;
     const alive = world.enemies.filter((e) => !e.dead).length + world.pendingSpawns;
-    if (w.spawnT <= 0 && alive < 3 + w.nights * 3) {
-      w.spawnT = Math.max(1.2, 3.2 - w.nights * 0.3);
+    if (w.spawnT <= 0 && alive < (3 + w.nights * 3) * (w.blood ? 1.6 : 1)) {
+      w.spawnT = Math.max(1.2, 3.2 - w.nights * 0.3) * (w.blood ? 0.6 : 1);
       const pool = ['zombie', 'zombie', 'zombie', ...(w.nights >= 2 ? ['crawler', 'crawler'] : []), ...(w.nights >= 3 ? ['bloater'] : [])];
       const at = room.freeSpot(p.pos, 10, 15);
       // nothing rises inside a campfire's light
       if (at.distanceTo(p.pos) >= 10 && !room.fires.some((f) => Math.hypot(f.x - at.x, f.z - at.z) < 5)) {
-        spawnEnemy(pick(pool), at.x, at.z, 1 + w.nights * 2, w.nights >= 3 && Math.random() < 0.15);
+        spawnEnemy(pick(pool), at.x, at.z, 1 + w.nights * 2, w.nights >= 3 && Math.random() < (w.blood ? 0.35 : 0.15));
       }
     }
   }
@@ -376,7 +382,7 @@ export function wildUpdate(dt) {
   }
 
   const m = w.mats;
-  run.label = `${night ? 'NIGHT ' + w.nights : 'DAY ' + (w.nights + 1)}<br>${m.wood} WOOD &nbsp;${m.stone} STONE &nbsp;${m.fiber} FIBER`;
+  run.label = `${night ? (w.blood ? '<span class="red">BLOOD MOON</span> ' : 'NIGHT ') + w.nights : 'DAY ' + (w.nights + 1)}<br>${m.wood} WOOD &nbsp;${m.stone} STONE &nbsp;${m.fiber} FIBER`;
 
   // gathering: stand by a tree, rock or bush and press Use
   let prompt = null;

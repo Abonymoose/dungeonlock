@@ -177,6 +177,20 @@ export const makeDrownedKing = () => crown(soak(skeleton('Skeleton_Warrior', {
   scale: 1.2, lend: [['Knight', '2H_Sword', 'handslotr']],
   anims: { ...SKEL, run: 'Walking_D_Skeletons', attack: '2H_Melee_Attack_Chop', cast: 'Spellcast_Summon' },
 }), 0x88d0e0), 0x2a8a7c, 1.0);
+// ---- the Ember Forges: the dead who work the furnaces, slag-orange ----
+export const makeCinderling = () => soak(skeleton('Skeleton_Minion', {
+  scale: 0.42, lend: [['Rogue_Hooded', 'Knife', 'handslotr']], anims: { ...SKEL, run: 'Running_A', attack: '1H_Melee_Attack_Stab' },
+}), 0xffa070);
+export const makeSmelter = () => soak(skeleton('Skeleton_Mage', {
+  lend: [['Rogue_Hooded', 'Throwable', 'handslotr']], anims: { ...SKEL, attack: 'Throw' },
+}), 0xff9a60);
+export const makeAnvilback = () => soak(skeleton('Skeleton_Warrior', {
+  scale: 0.66, lend: [['Knight', '2H_Sword', 'handslotr']], anims: { ...SKEL, run: 'Walking_B', attack: '2H_Melee_Attack_Chop' },
+}), 0xd89070);
+export const makeForgemaster = () => crown(soak(skeleton('Skeleton_Warrior', {
+  scale: 1.25, lend: [['Knight', '2H_Sword', 'handslotr']],
+  anims: { ...SKEL, run: 'Walking_D_Skeletons', attack: '2H_Melee_Attack_Chop', cast: 'Spellcast_Summon' },
+}), 0xffb080), 0xff6a20, 1.0);
 export const makeBandit = () => character('Rogue_Hooded', {
   tint: [C.ONYX, 0x8a5a3a, 0xE0C8A0, 0.95], hide: ['1H_Crossbow', '2H_Crossbow', 'Throwable', 'Knife_Offhand'],
   anims: { ...HUMAN, attack: 'Dualwield_Melee_Attack_Stab' },
@@ -185,6 +199,7 @@ export const makeCrossbowman = () => character('Rogue_Hooded', {
   tint: [C.ONYX, 0x4a5a80, 0xC8D0E0, 0.95], hide: ['1H_Crossbow', 'Throwable', 'Knife', 'Knife_Offhand'],
   anims: { ...HUMAN, attack: '2H_Ranged_Shoot' },
 });
+export const makeHalberdier = () => character('Knight', { tint: [C.ONYX, 0x4a5a6e, C.OAK, 0.5], hide: [...knightWith(['2H_Sword']), 'Knight_Cape'], anims: { ...HUMAN, attack: '1H_Melee_Attack_Stab' } });
 export const makeGuard = () => character('Knight', { tint: [C.ONYX, C.CRIMSON, C.OAK, 0.5], hide: knightWith(['1H_Sword', 'Rectangle_Shield']), anims: { ...HUMAN, attack: 'Block_Attack' } });
 export const makeSoldier = () => character('Knight', { tint: [C.ONYX, 0x6E5050, C.OAK, 0.5], hide: [...knightWith(['1H_Sword']), 'Knight_Cape'], anims: HUMAN });
 export const makeCaptain = () => character('Knight', { scale: 0.58, tint: [C.ONYX, 0x8a6a2a, 0xF0D898, 0.55], hide: knightWith(['1H_Sword', 'Badge_Shield']), anims: { ...HUMAN, attack: '1H_Melee_Attack_Slice_Horizontal' } });
@@ -221,6 +236,13 @@ export function makeIcon(type) {
   } else if (type === 'shard') {
     const m = part(root, new THREE.OctahedronGeometry(0.16), C.SAND, 0, 0.3, 0, true);
     m.scale.set(0.6, 1.4, 0.6);
+  } else if (type === 'trial') {
+    // two crossed blades
+    for (const a of [-0.7, 0.7]) part(root, box(0.07, 0.6, 0.07), C.CRIMSON, 0, 0.35, 0, true).rotation.z = a;
+  } else if (type === 'chest') {
+    part(root, box(0.46, 0.26, 0.3), C.OAK, 0, 0.25, 0, true);
+    part(root, box(0.5, 0.1, 0.34), C.CHOC, 0, 0.43, 0, true);
+    part(root, box(0.08, 0.1, 0.05), C.SAND, 0, 0.33, 0.17, true);
   } else if (type === 'ash') {
     for (const [x, z, s] of [[0, 0, 0.22], [0.16, 0.1, 0.14], [-0.12, 0.12, 0.12]]) part(root, box(s, s, s), C.OAK, x, s / 2, z, true);
   } else {

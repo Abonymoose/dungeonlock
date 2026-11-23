@@ -130,17 +130,20 @@ export function homeScreen(sel, meta) {
 const CARDS = [
   { id: 'dungeon', name: 'Dungeon', desc: 'Pick a class and descend. It gets harder the deeper you go.', art: 'card-dungeon' },
   { id: 'open', name: 'Open World', desc: 'Beta. A huge wild island. Gather and craft by day; zombies rise at night. How many nights can you last?', art: 'card-open' },
-  { id: 'adventure', name: 'Adventure', desc: 'A story in six chapters. You are a village swordsmith, and the princess is held in the castle. No magic: one sword.', art: 'card-adventure' },
+  { id: 'adventure', name: 'Adventure', desc: 'A story in eight chapters. You are a village swordsmith, and the princess is held in the castle. No magic: one sword.', art: 'card-adventure' },
+  { id: 'daily', name: 'Daily Run', desc: '', art: 'card-dungeon', css: 'daily' },
   { id: 'tutorial', name: 'Tutorial', desc: 'Learn to move, fight, cast and take boons in one quiet room.', art: 'card-tutorial' },
 ];
 export const PLAY_CARDS = CARDS.map((c) => c.id);
-export function playScreen(sel, meta) {
+// daily: { cls, vow, board: [html] | null }: today's rules and the top of the board
+export function playScreen(sel, meta, daily) {
   const cards = CARDS.map((c, i) => `
-    <div class="pcard ${c.locked ? 'locked' : ''} ${i === sel ? 'sel' : ''}" data-sel="${i}">
+    <div class="pcard ${c.css ?? ''} ${c.locked ? 'locked' : ''} ${i === sel ? 'sel' : ''}" data-sel="${i}">
       <div class="art"><img src="assets/shots/${c.art}.png" alt="">${c.locked ? `<div class="padlock">${KEYHOLE}</div>` : ''}</div>
       <div class="pbody">
         <h3>${c.name}</h3>
-        <p>${c.desc}</p>
+        <p>${c.id === 'daily' ? `The same dungeon for everyone today: ${daily.cls}, ${daily.vow}, no Anvil. Best score goes on the board.` : c.desc}</p>
+        ${c.id === 'daily' && daily.board?.length ? `<ol class="board">${daily.board.map((b) => `<li>${b}</li>`).join('')}</ol>` : ''}
         ${c.id === 'tutorial' && meta.tutorialDone ? '<p class="done">Completed</p>' : ''}
         ${c.id === 'adventure' && meta.adventure ? `<p class="done">Continue: Chapter ${meta.adventure.chapter + 1}</p>` : c.id === 'adventure' && meta.adventureDone ? '<p class="done">Completed</p>' : ''}
       </div>

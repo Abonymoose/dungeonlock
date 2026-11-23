@@ -40,6 +40,20 @@ export function furnishShrine(room) {
   room.shrine = { pos: at, orb, used: false };
 }
 
+// A Chest room: one chest in the middle. Open it for treasure, or an ambush that pays better once you survive it.
+export function furnishChest(room) {
+  const at = room.freeSpot(room.center, 0, 2);
+  const chest = prop('chest', 0.5);
+  chest.position.copy(at);
+  chest.rotation.y = Math.PI / 4;
+  room.group.add(chest);
+  room.obstacles.push({ x: at.x, z: at.z, hw: 0.45, hd: 0.45 });
+  const glow = new THREE.Mesh(new THREE.OctahedronGeometry(0.12), basic(C.SAND));
+  glow.position.set(at.x, 1.3, at.z);
+  room.group.add(glow);
+  room.chest = { pos: at, model: chest, glow, opened: false };
+}
+
 export function furnishShop(room) {
   const c = room.center;
   const peddler = character('Rogue_Hooded', { tint: [C.ONYX, 0x3a2a4a, 0xd8c8b0, 0.7], hide: ['1H_Crossbow', '2H_Crossbow', 'Knife', 'Knife_Offhand'], anims: { idle: 'Idle', cheer: 'Cheer' } });

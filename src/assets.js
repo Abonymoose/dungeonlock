@@ -21,7 +21,7 @@ const PROPS = [
   'floor_tile_small', 'floor_tile_large', 'floor_tile_small_broken_A', 'floor_tile_small_broken_B', 'floor_tile_small_decorated',
   'floor_tile_big_spikes', 'floor_foundation_front', 'floor_foundation_corner', 'wall', 'wall_doorway', 'wall_gated', 'wall_cracked',
   'pillar', 'pillar_decorated', 'torch_mounted', 'barrel_large', 'barrel_small', 'crates_stacked', 'rubble_half',
-  'banner_patternA_red', 'banner_red', 'sword_shield_broken', 'candle_triple', 'box_large',
+  'banner_patternA_red', 'banner_red', 'sword_shield_broken', 'candle_triple', 'box_large', 'chest',
 ];
 // Adventure mode's village and castle, from the KayKit Medieval Hexagon Pack (made small for a hex board; scaled up to walk among)
 export const MEDIEVAL = [

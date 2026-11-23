@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { C } from './config.js';
 import { world } from './world.js';
-import { makeGrunt, makeZombie, makeCrawler, makeBloater, makeBandit, makeCrossbowman, makeGuard, makeSoldier, makeCaptain, makeBlackKnight, makeHexer, makeBrute, makeStalker, makeSapper, makeWhirler, makeSlinger, makeShieldbearer, makeBonecaller, makeWarden, makePrior, makeReaver, makeDrowned, makeTidecaller, makeLurker, makeDrownedKing, makeGraveLord, disposeObject } from './models.js';
+import { makeGrunt, makeZombie, makeCrawler, makeBloater, makeBandit, makeCrossbowman, makeGuard, makeSoldier, makeCaptain, makeBlackKnight, makeHexer, makeBrute, makeStalker, makeSapper, makeWhirler, makeSlinger, makeShieldbearer, makeBonecaller, makeWarden, makePrior, makeReaver, makeDrowned, makeTidecaller, makeLurker, makeDrownedKing, makeGraveLord, makeCinderling, makeSmelter, makeAnvilback, makeForgemaster, makeHalberdier, disposeObject } from './models.js';
 import { earn } from './feats.js';
 import { XP_FOR, xpToNext } from './run.js';
 import { updateStatus } from './boons.js';
@@ -21,6 +21,7 @@ export const TYPES = {
   crossbowman: { name: 'Crossbowman', about: 'Keeps back and shoots down a red line. Close the distance or step out of the line.', model: makeCrossbowman, hp: 26, speed: 2.6, radius: 0.3, ash: 3, think: hexerAI },
   guard: { name: 'Castle Guard', about: 'Holds a tall shield to the front and turns slowly. Step round it and strike its back.', model: makeGuard, hp: 46, speed: 2.3, radius: 0.36, armor: 0.1, ash: 4, iron: 1, knockResist: 0.5, guard: true, think: shieldAI },
   soldier: { name: 'Soldier', about: "The usurper's man-at-arms. Wide, heavy chops; wait for the swing, then answer it.", model: makeSoldier, hp: 44, speed: 2.8, radius: 0.34, armor: 0.1, ash: 4, iron: 1, think: gruntAI },
+  halberdier: { name: 'Halberdier', about: 'A long blade on a long reach. Thrusts straight ahead from well outside your sword, so come at it from the side.', model: makeHalberdier, hp: 50, speed: 2.4, radius: 0.36, armor: 0.1, ash: 5, iron: 2, think: halberdAI },
   captain: { name: 'Captain', about: 'Leads the guard. A long windup, then a cut all the way round him. Step back and come in after.', model: makeCaptain, hp: 110, speed: 2.4, radius: 0.45, armor: 0.15, ash: 10, iron: 3, knockResist: 0.3, stunResist: 0.5, think: bruteAI },
   blackknight: { name: 'The Black Knight', title: "Champion of the Usurper", boss: true, about: 'Waits at the top of the tower. Wide sweeps, an overhead smash, and a running thrust.', model: makeBlackKnight, hp: 300, speed: 2.6, radius: 0.6, armor: 0.15, ash: 30, iron: 5, knockResist: 0.15, stunResist: 0.3, think: knightBossAI },
   grunt: { name: 'Grunt', about: 'Walks up and swings its sword in a wide arc. Slow to recover.', model: makeGrunt, hp: 34, speed: 3.0, radius: 0.33, ash: 2, think: gruntAI },
@@ -41,6 +42,11 @@ export const TYPES = {
   tidecaller: { name: 'Tidecaller', about: 'Hangs back and throws a wave of three slow bolts. Walk between them, or close in.', model: makeTidecaller, hp: 30, speed: 2.4, radius: 0.3, ash: 4, think: tidecallerAI },
   lurker: { name: 'Lurker', about: 'Fast and low. Lunges twice in a row along red lines, so dodge the second one too.', model: makeLurker, hp: 32, speed: 4.4, radius: 0.3, ash: 4, think: lurkerAI },
   drownedking: { name: 'The Drowned King', title: 'Lord of the Sunken Vaults', boss: true, about: 'Sends walls of water down long lines, opens whirlpools that drag you in, and charges. Calls the drowned when hurt.', model: makeDrownedKing, hp: 460, speed: 2.3, radius: 0.85, armor: 0.1, ash: 45, knockResist: 0.1, stunResist: 0.25, think: kingAI },
+  // the Ember Forges (depths 21-30, then every third ten): the furnace dead, and the master of the forge
+  cinderling: { name: 'Cinderling', about: 'Small and quick, with a knife. When it dies it bursts into flame after a short warning circle, so step away from what you kill.', model: makeCinderling, hp: 22, speed: 4.2, radius: 0.28, ash: 2, burst: true, think: gruntAI },
+  smelter: { name: 'Smelter', about: 'Lobs molten iron where you stand. It splashes once, then the pool burns again a moment later: get out and stay out.', model: makeSmelter, hp: 32, speed: 2.5, radius: 0.3, ash: 4, think: smelterAI },
+  anvilback: { name: 'Anvilback', about: 'Slow and heavily armoured. Slams the ground twice, the second time wider. Corrode and Doom cut through armour best.', model: makeAnvilback, hp: 90, speed: 1.9, radius: 0.45, armor: 0.3, ash: 6, knockResist: 0.3, think: anvilAI },
+  forgemaster: { name: 'The Forgemaster', title: 'Lord of the Ember Forges', boss: true, about: 'Hammers the floor and sends rings of sparks out of it, rains molten iron around you, and charges. Calls cinderlings when hurt.', model: makeForgemaster, hp: 520, speed: 2.3, radius: 0.9, armor: 0.15, ash: 50, knockResist: 0.1, stunResist: 0.25, think: forgeAI },
   // the tutorial's training target: never moves, never attacks, never dies
   dummy: { name: 'Dummy', model: makeGrunt, hp: 99999, speed: 0, radius: 0.33, ash: 0, knockResist: 0, think: () => {} },
 };
@@ -67,7 +73,7 @@ export function spawnEnemy(type, x, z, depth, elite = false) {
 
 function create(type, x, z, depth, elite = false) {
   const T = TYPES[type];
-  const e = makeEntity(T.model(), { team: 1, hp: Math.round(T.hp * (1 + depth * 0.08 + Math.max(0, depth - 10) * 0.05) * (settings.hardcore ? 1.5 : 1) * (world.run?.curse?.id === 'iron' ? 1.4 : 1)), radius: T.radius, speed: T.speed * (1 + Math.min(depth, 40) * 0.008), armor: T.armor ?? 0 });
+  const e = makeEntity(T.model(), { team: 1, hp: Math.round(T.hp * (1 + depth * 0.08 + Math.max(0, depth - 10) * 0.05) * (settings.hardcore ? 1.5 : 1) * (world.run?.curse?.id === 'iron' ? 1.4 : 1) * (world.run?.vows?.includes('iron') ? 1.4 : 1)), radius: T.radius, speed: T.speed * (1 + Math.min(depth, 40) * 0.008) * (world.run?.vows?.includes('swift') ? 1.25 : 1), armor: T.armor ?? 0 });
   Object.assign(e, {
     type, T, depth, state: 'recover', timer: 0.4 + Math.random() * 0.6, phase: 0, swingT: 0, walkT: 0, deadT: 0,
     knockResist: T.knockResist ?? 1, stunResist: T.stunResist ?? 1, guard: !!T.guard,
@@ -99,12 +105,12 @@ function onDeath(e) {
   const run = world.run, p = world.player;
   if (e.type === 'gravelord' && !e.burned) earn('gravelord');
   // a volatile elite goes off a moment after it falls
-  if (e.affix === 'volatile') {
+  if (e.affix === 'volatile' || e.T.burst) {
     const at = e.pos.clone();
     telegraph({ shape: 'circle', pos: at, radius: 2.0, duration: 0.6, onDone: () => { aoe(e, { pos: at, radius: 2.0, damage: 14 + e.depth, knockback: 8 }); sfx('slam'); } });
   }
   run.kills++;
-  run.ash += e.T.ash;
+  run.ash += e.T.ash * (run.wild?.blood ? 2 : 1); // a Blood Moon pays double
   if (world.adventure && e.T.iron) world.adventure.iron += e.T.iron;
   // XP: level-ups wait until the room is clear, so a menu never pops up mid-fight
   run.xp += XP_FOR[e.type] ?? 0;
@@ -582,6 +588,81 @@ function dart(e) {
   windup(e, { shape: 'line', length: 4.5, width: 0.6, duration: 0.45 }, () => {
     Object.assign(e, { state: 'charging', chargeT: 4.5 / 16, chargeHit: false, chargeDir: line, chargeSpeed: 16, chargeDmg: 9 + e.depth });
   }, e.chain > 0 ? 0 : 1.1 + Math.random() * 0.5);
+}
+
+// A long, straight thrust from outside sword reach
+function halberdAI(e, p, dt) {
+  if (!ready(e, dt)) return;
+  const d = face(e, p);
+  if (d > 3.2) return walk(e);
+  if (d < 1.4) return walk(e, -1); // keeps you at the end of the blade
+  windup(e, { shape: 'line', length: 3.6, width: 0.7, duration: 0.7 }, () => meleeArc(e, { range: 3.6, arc: 0.45, damage: 12 + e.depth, knockback: 6 }), 1.0);
+}
+
+// Lobs molten iron: it splashes where you stood, then the pool flares again
+function smelterAI(e, p, dt) {
+  if (!ready(e, dt)) return;
+  const d = face(e, p);
+  if (d < 4) return walk(e, -1);
+  if (d > 9) return walk(e);
+  const at = p.pos.clone();
+  e.state = 'windup';
+  e.model.anim.once('attack', 1);
+  const splash = (radius, dmg, then) => telegraph({ owner: e, shape: 'circle', pos: at, radius, duration: then ? 0.9 : 0.7, onDone: () => { aoe(e, { pos: at, radius, damage: dmg, knockback: 4 }); burst(at, 0xff7a30, 8); then?.(); }, onCancel: () => { e.state = 'recover'; e.timer = 0.4; } });
+  splash(1.3, 11 + e.depth, () => { e.state = 'recover'; e.timer = 1.8 + Math.random(); splash(1.7, 8 + e.depth); });
+}
+
+// Two slams: a close one, then a wider one
+function anvilAI(e, p, dt) {
+  if (!ready(e, dt)) return;
+  const d = face(e, p);
+  if (d > 2.0) return walk(e);
+  windup(e, { shape: 'circle', radius: 2.0, duration: 0.8 }, () => {
+    aoe(e, { pos: e.pos, radius: 2.0, damage: 14 + e.depth, knockback: 6 });
+    sfx('slam');
+    windup(e, { shape: 'circle', radius: 3.2, duration: 0.7 }, () => { aoe(e, { pos: e.pos, radius: 3.2, damage: 12 + e.depth, knockback: 10 }); world.shake = 0.3; sfx('slam'); }, 1.4);
+  }, 0);
+}
+
+// Boss of the Ember Forges: a hammer slam that throws rings of sparks, molten rain around you, and a charge. Calls cinderlings when hurt.
+function forgeAI(e, p, dt) {
+  if (e.state === 'charging') return chargeStep(e, p, dt);
+  if (e.state === 'windup') return;
+  const enraged = e.hp < e.maxHp / 2, k = enraged ? 0.75 : 1;
+  e.timer -= dt;
+  const d = face(e, p);
+  if (e.timer > 0) return walk(e, d > 3 ? 0.6 : 0);
+  if (enraged && !e.called) {
+    e.called = true;
+    floatText(e.pos, 'STOKE THE FIRES!', 'crit');
+    for (let i = 0; i < 4; i++) { const at = near(e.pos, 2.6); spawnEnemy('cinderling', at.x, at.z, e.depth); }
+  }
+  const move = e.phase++ % 3;
+  if (move === 0) {
+    // the hammer: a slam, then a ring of sparks flying out of it (two rings once he is hurt)
+    windup(e, { shape: 'circle', radius: 2.8, duration: 1.0 * k }, () => {
+      aoe(e, { pos: e.pos, radius: 2.8, damage: 22, knockback: 10 });
+      world.shake = 0.4;
+      sfx('slam');
+      const n = enraged ? 16 : 10;
+      for (let i = 0; i < n; i++) fireProjectile({ owner: e, dir: new THREE.Vector3(Math.cos(i / n * Math.PI * 2), 0, Math.sin(i / n * Math.PI * 2)), speed: 7, damage: 12, range: 11, size: 0.2, color: C.CRIMSON });
+    }, 1.2 * k);
+  } else if (move === 1) {
+    // molten rain: circles land where you stand and all around you
+    e.state = 'windup';
+    e.model.anim.once('cast', 1);
+    const spots = [p.pos.clone(), ...Array.from({ length: enraged ? 6 : 4 }, () => near(p.pos, 3.5))];
+    spots.forEach((at, i) => telegraph({
+      owner: e, shape: 'circle', pos: at, radius: 1.5, duration: (1.0 + i * 0.12) * k,
+      onDone: () => { aoe(e, { pos: at, radius: 1.5, damage: 16, knockback: 5 }); burst(at, 0xff7a30, 6); if (i === spots.length - 1) { e.state = 'recover'; e.timer = 0.9 * k; } },
+      onCancel: i ? null : () => { e.state = 'recover'; e.timer = 0.3; },
+    }));
+  } else {
+    const line = e.facing.clone();
+    windup(e, { shape: 'line', length: 9, width: 1.7, duration: 0.85 * k }, () => {
+      Object.assign(e, { state: 'charging', chargeT: 9 / 14, chargeHit: false, chargeDir: line, chargeSpeed: 14, chargeDmg: 24 });
+    }, 0.4);
+  }
 }
 
 // Boss of the Sunken Vaults: walls of water down long lines, whirlpools where you stand, and a charge. Calls the drowned when hurt.

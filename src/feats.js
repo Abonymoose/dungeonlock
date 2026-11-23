@@ -11,6 +11,8 @@ export const FEATS = [
   { id: 'reaver', name: 'Blunted', desc: 'Defeat the Reaver.', ash: 50 },
   { id: 'vaults', name: 'Wet Feet', desc: 'Reach the Sunken Vaults, below the first Lock.', ash: 60 },
   { id: 'drownedking', name: 'Dethroned', desc: 'Defeat the Drowned King.', ash: 120 },
+  { id: 'forges', name: 'Into the Fire', desc: 'Reach the Ember Forges, below the second Lock.', ash: 100 },
+  { id: 'forgemaster', name: 'Quenched', desc: 'Defeat the Forgemaster.', ash: 160 },
   { id: 'depth20', name: 'Twenty Down', desc: 'Reach depth 20.', ash: 150 },
   { id: 'untouched', name: 'Untouched', desc: 'Clear a room at depth 5 or deeper without taking a hit.', ash: 50 },
   { id: 'collector', name: 'Full House', desc: 'Carry six boons at once.', ash: 60 },
@@ -22,6 +24,10 @@ export const FEATS = [
   { id: 'dodger', name: 'Ghost Step', desc: 'Make ten perfect dodges in one run.', ash: 80 },
   { id: 'gravelord', name: 'Lights Out', desc: 'Kill the Grave Lord in the Wilds.', ash: 120 },
   { id: 'shrine', name: 'A Fair Price', desc: 'Strike a bargain at a Shrine.', ash: 30 },
+  { id: 'trial', name: 'Proven', desc: 'Pass a Trial.', ash: 40 },
+  { id: 'ambush', name: 'Not a Chest', desc: 'Survive a chest ambush.', ash: 40 },
+  { id: 'vowed', name: 'Sworn', desc: 'Reach depth 10 with three or more vows sworn.', ash: 150 },
+  { id: 'bloodmoon', name: 'Red Dawn', desc: 'Live through a Blood Moon in the Wilds.', ash: 80 },
   { id: 'army', name: 'Army of One', desc: 'Have four raised dead fighting for you at once.', ash: 60 },
 ];
 
