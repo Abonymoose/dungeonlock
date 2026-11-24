@@ -3,7 +3,8 @@ import { toScreen } from './render.js';
 import { input } from './input.js';
 
 // Quick chat: 1-9 and 0 send an emoji over your head (Shift for the second ten), seen by everyone in a co-op run.
-// Phones get a chat button with all twenty. Names and health bars ride over the other players here too.
+// Phones get a chat button with all twenty. On a controller the d-pad sends four, and holding LT (or pressing in the
+// right stick) opens a wheel of all twenty: point the right stick at one and let go. Names and health bars ride here too.
 export const EMOTES = ['👍', '👎', '💩', '😂', '🔥', '💀', '❤️', '😭', '😎', '👋', '🤡', '🎉', '😡', '🙏', '🤝', '👀', '💯', '🗿', '🐐', '🤯'];
 export const emoteHooks = { send: null }; // the co-op layer sets this to pass emotes on
 const BUBBLE = 2.6, FEED = 5;
@@ -13,7 +14,9 @@ const feed = Object.assign(document.createElement('div'), { id: 'chatfeed' });
 const button = Object.assign(document.createElement('div'), { id: 'emotebtn', textContent: '💬' });
 const panel = Object.assign(document.createElement('div'), { id: 'emotepanel', className: 'hidden' });
 panel.innerHTML = EMOTES.map((e, i) => `<span data-emote="${i}">${e}<small>${i < 10 ? (i + 1) % 10 : `⇧${(i - 9) % 10}`}</small></span>`).join('');
-document.body.append(layer, feed, button, panel);
+const wheel = Object.assign(document.createElement('div'), { id: 'emotewheel', className: 'hidden' });
+wheel.innerHTML = EMOTES.map((e, i) => { const a = (i / EMOTES.length) * Math.PI * 2 - Math.PI / 2; return `<span style="transform: translate(${(Math.cos(a) * 7.5).toFixed(2)}em, ${(Math.sin(a) * 7.5).toFixed(2)}em)">${e}</span>`; }).join('') + '<b>LET GO TO SEND</b>';
+document.body.append(layer, feed, button, panel, wheel);
 
 const tags = new Map(); // entity -> { el, bubble, until, name, hp }
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -68,6 +71,27 @@ panel.addEventListener('click', (e) => {
   send(Number(b.dataset.emote));
   panel.classList.add('hidden');
 });
+
+// once a frame, right after input is read: the d-pad's four, and the wheel (which borrows the right stick from aiming)
+const DPAD = { 12: 0, 13: 1, 14: 2, 15: 3 }; // up 👍, down 👎, left 💩, right 😂
+let padWas = [], pick = -1;
+export function padEmotes() {
+  const pad = input.pad, now = pad ? pad.buttons.map((b) => b.pressed) : [];
+  const was = padWas;
+  padWas = now;
+  const open = world.state === 'play' && (now[6] || now[11]);
+  if (world.state === 'play') for (const [b, i] of Object.entries(DPAD)) if (now[b] && !was[b]) send(i);
+  if (open) {
+    const x = pad.axes[2] ?? 0, y = pad.axes[3] ?? 0;
+    if (Math.hypot(x, y) > 0.5) pick = Math.round((((Math.atan2(y, x) + Math.PI / 2) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2) * EMOTES.length) % EMOTES.length;
+    input.aim = null; // the stick is choosing an emoji, not turning you
+    [...wheel.children].forEach((s, i) => s.classList.toggle('on', i === pick));
+  } else if (!wheel.classList.contains('hidden')) {
+    if (pick >= 0) send(pick);
+    pick = -1;
+  }
+  wheel.classList.toggle('hidden', !open);
+}
 
 // once a frame: keep every tag over its owner. Remote players show a name and health; anyone can show a bubble.
 export function updateTags(remotes = []) {

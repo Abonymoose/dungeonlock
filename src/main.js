@@ -23,7 +23,7 @@ import { updateTouch } from './touch.js';
 import { keepPlan, furnishKeep, keepUpdate, VOWS, sworn, vowBonus } from './keep.js';
 import { earn } from './feats.js';
 import { net, coop, isHost, isGuest, connect, leave, hello, players, randomCode, send, netTick, placeRemotes, waitingOn, allDown, aliveRemote } from './net.js';
-import { updateTags } from './emote.js';
+import { updateTags, padEmotes } from './emote.js';
 import { WARES, priceOf, furnishShop, BARGAINS, furnishShrine, furnishChest } from './shop.js';
 
 const CLASS_IDS = Object.keys(CLASSES);
@@ -1153,7 +1153,7 @@ const STATES = {
 // One simulation step. Exported so tests can step the game at a fixed rate.
 export function frame(dt) {
   // skip polling during hit-stop so presses made in those frames still count afterwards
-  if (!(world.state === 'play' && world.hitstop > 0)) pollInput();
+  if (!(world.state === 'play' && world.hitstop > 0)) { pollInput(); padEmotes(); }
   STATES[world.state](dt);
   menu.click = false;
   updateTouch(world);
