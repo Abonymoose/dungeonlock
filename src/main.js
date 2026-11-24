@@ -22,6 +22,8 @@ import { makePrincess } from './models.js';
 import { updateTouch } from './touch.js';
 import { keepPlan, furnishKeep, keepUpdate, VOWS, sworn, vowBonus } from './keep.js';
 import { earn } from './feats.js';
+import { net, coop, isHost, isGuest, connect, leave, hello, players, randomCode, send, netTick, placeRemotes, waitingOn, allDown, aliveRemote } from './net.js';
+import { updateTags } from './emote.js';
 import { WARES, priceOf, furnishShop, BARGAINS, furnishShrine, furnishChest } from './shop.js';
 
 const CLASS_IDS = Object.keys(CLASSES);
@@ -125,13 +127,14 @@ async function enterMenu(state) {
 const NO_UPGRADES = { vitality: 0, whetstone: 0, lastbreath: 0, shards: 0, quickstep: 0, favor: 0, insight: 0, sparekey: 0 };
 const anvil = () => (settings.hardcore || world.run?.daily ? NO_UPGRADES : meta); // the Daily Run is the same for everyone
 
-function startRun(daily = null) {
+function startRun(daily = null, wait = false) {
   world.run = { depth: 0, keys: anvil().sparekey ? 1 : 0, ash: 0, kills: 0, boons: [], keyDoorsSeen: 0, xp: 0, level: 1, pendingLevels: 0, rerolls: anvil().insight, t0: world.time, featsAtStart: Object.keys(meta.feats ?? {}).length,
-    vows: daily ? [daily.vow] : menu.mode === 'open' ? [] : [...(meta.vows ?? [])], daily };
+    vows: daily ? [daily.vow] : menu.mode !== 'dungeon' ? [] : [...(meta.vows ?? [])], daily };
   ui.hideScreen();
   newPlayer();
   world.player.lives = sworn(world.run, 'forsworn') ? 0 : anvil().lastbreath;
   ui.setSlots([]);
+  if (wait) { world.state = 'transition'; ui.fadeTo(true); return; } // a co-op guest: the host sends the first room
   enterRoom(menu.mode === 'open' ? makeWild() : makePlan(0, 'start'));
 }
 
@@ -139,6 +142,7 @@ async function enterRoom(plan) {
   world.state = 'transition';
   ui.setPrompt(null);
   if (plan.depth > 0) sfx('door');
+  if (isHost()) { plan.doorPlans ??= rollDoors(plan.depth, world.run); send({ t: 'room', plan }); }
   await ui.fadeTo(true);
   resetWorld();
   world.run.depth = plan.depth;
@@ -161,6 +165,7 @@ async function enterRoom(plan) {
   p.model.root.rotation.y = Math.atan2(GROUND_UP.x, GROUND_UP.z);
   p.dashT = 0; p.charge = null;
   p.ammo = p.maxAmmo;
+  if (coop()) { if (p.dead) revive(p); placeRemotes(room.entry); }
   updateCamera(0, p.pos.clone().lerp(room.center, 0.2), true);
 
   if (!plan.waves.length) room.cleared = true;
@@ -186,6 +191,8 @@ function endRun(kind) {
   if (world.run.keep) return enterMenu('playmenu'); // leaving the Keep isn't a run
   Math.random = realRandom;
   if (world.run.daily) postDaily(world.run, kind);
+  if (isHost()) send({ t: 'end', kind });
+  if (net.code) leave(); // a co-op run ends for everyone together
   const run = world.run, ash = Math.round((run.ash + (kind === 'escaped' ? 60 : 0)) * (1 + 0.15 * meta.greed) * (1 + vowBonus(run.vows) / 100));
   meta.ash += ash;
   meta.runs++;
@@ -244,6 +251,73 @@ function openVows(at = 0) {
   renderChoice();
 }
 
+// ---- co-op: the lobby, and what the host's messages do here ----
+const coopMe = () => ({ name: meta.name, cls: CLASS_IDS[menu.cls], weapon: equipped(CLASS_IDS[menu.cls], meta).id });
+function lobbyView() {
+  const items = !net.code ? ['Host a game', 'Join a game', 'Back']
+    : [...(net.host ? ['Start the run'] : []), `Class: ${CLASSES[CLASS_IDS[menu.cls]].name}`, 'Leave'];
+  return { code: net.code, host: net.host, items, msg: menu.lobbyMsg ?? '', players: players().map((p) => ({ ...p, cls: CLASSES[p.cls]?.name ?? p.cls })) };
+}
+function enterLobby() {
+  if (!meta.name) {
+    const name = (window.prompt('Your name for co-op (up to 16 letters):') ?? '').trim().slice(0, 16);
+    if (!name) return;
+    meta.name = name;
+    saveMeta();
+  }
+  menu.lobby = 0;
+  menu.lobbyMsg = '';
+  net.onChange = () => { if (world.state === 'lobby') RENDER.lobby(); };
+  show('lobby');
+}
+async function hostGame() {
+  menu.lobbyMsg = 'Opening a room...';
+  RENDER.lobby();
+  try {
+    // a code someone else is already using makes us a guest there: try another
+    for (let i = 0; i < 5 && !(await connect(randomCode(), coopMe())).host; i++) leave();
+    menu.lobbyMsg = net.host ? '' : 'Could not open a room. Try again.';
+  } catch (e) { menu.lobbyMsg = `Could not open a room: ${e.message}.`; }
+  menu.lobby = 0;
+  RENDER.lobby();
+}
+async function joinGame() {
+  const code = (window.prompt('Room code (4 letters):') ?? '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+  if (code.length !== 4) return;
+  menu.lobbyMsg = 'Joining...';
+  RENDER.lobby();
+  try {
+    if ((await connect(code, coopMe())).host) { leave(); menu.lobbyMsg = `No game in room ${code}.`; } else menu.lobbyMsg = '';
+  } catch (e) { menu.lobbyMsg = `Could not join: ${e.message}.`; }
+  menu.lobby = 0;
+  RENDER.lobby();
+}
+function revive(p) {
+  Object.assign(p, { dead: false, deathT: 0, invuln: 2, hurtT: 0 });
+  p.hp = Math.max(1, Math.round(p.maxHp * 0.4));
+  p.model.anim.loop('idle');
+  p.model.root.visible = true;
+  floatText(p.pos, 'BACK UP', 'heal');
+}
+// you're down in a co-op run: watch, and the host keeps the room going; it's over when everyone is down
+function coopDown(dt) {
+  if (!world.player.downShown) { world.player.downShown = true; ui.showBanner('DOWN', 'You get back up when the room is won.', 2000); }
+  if (!isHost()) return;
+  roomFlow(dt);
+  if (world.player.deathT > 0.6 && allDown()) endRun('dead');
+}
+net.on.start = () => { if (world.state !== 'lobby') return; menu.mode = 'coop'; net.inRun = true; startRun(null, true); };
+net.on.room = (plan) => { if (net.inRun && world.run) enterRoom(plan); };
+net.on.cleared = () => { if (world.room && !world.room.cleared) clearRoom(); };
+net.on.chest = (ambush) => { if (world.room?.chest) openChest(world.room, ambush); };
+net.on.revive = () => { if (world.player?.dead) revive(world.player); };
+net.on.end = (kind) => { if (world.run && world.state !== 'over') endRun(kind); };
+net.on.hostLeft = () => { ui.toast('<b>THE HOST LEFT</b><span>The run ends here.</span>'); if (world.run && world.state !== 'over') endRun('abandoned'); };
+net.on.lost = (wasIn) => {
+  if (wasIn && world.run && world.state !== 'over') { ui.toast('<b>CONNECTION LOST</b><span>The co-op run ends here.</span>'); endRun('abandoned'); }
+  if (world.state === 'lobby') { menu.lobbyMsg = 'Disconnected.'; RENDER.lobby(); }
+};
+
 // ---- Trials and Chests ----
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const TRIALS = (plan) => [
@@ -267,13 +341,15 @@ function trialReward(room) {
   ui.showBanner('TRIAL PASSED', 'Take an Epic boon.', 1600);
   room.addPickup('boon', dx, dz, metPatron()).epic = true;
 }
-function openChest(room) {
+function openChest(room, ambush = Math.random() >= 0.55) {
   const c = room.chest, depth = room.plan.depth;
+  if (!c || c.opened) return;
+  if (isHost()) send({ t: 'chest', ambush });
   c.opened = true;
   c.glow.visible = false;
   c.model.rotation.x = -0.3;
   sfx('unlock');
-  if (Math.random() < 0.55) {
+  if (!ambush) {
     ui.showBanner('TREASURE', '', 1200);
     burst(c.pos, 0xf0c040, 14);
     room.addPickup('bigash', c.pos.x + 1.1, c.pos.z + 0.3);
@@ -297,6 +373,8 @@ function openChest(room) {
 function clearRoom() {
   const room = world.room, kind = room.plan.kind;
   room.cleared = true;
+  if (isHost()) { send({ t: 'cleared' }); send({ t: 'revive' }); }
+  if (coop() && world.player.dead) revive(world.player); // the fallen get up when the room is won
   const c = world.run.curse;
   if (c && room.plan.waves.length && --c.rooms <= 0) { world.run.curse = null; ui.toast(`<b>${c.name.toUpperCase()} PAID</b><span>The Lock is satisfied.</span>`); }
   dungeonFeats(true);
@@ -498,9 +576,9 @@ function openPerks() {
   });
 }
 
-function roomLogic(dt) {
-  const room = world.room, run = world.run, p = world.player;
-  if (!room.cleared) {
+function roomFlow(dt) {
+  const room = world.room;
+  if (!room.cleared && !isGuest()) { // a guest's room clears when the host's does
     if (world.waveDelay > 0) {
       world.waveDelay -= dt;
       if (world.waveDelay <= 0) spawnWave();
@@ -509,6 +587,11 @@ function roomLogic(dt) {
       else clearRoom();
     }
   }
+}
+
+function roomLogic(dt) {
+  const room = world.room, run = world.run, p = world.player;
+  roomFlow(dt);
   let wildPrompt = null;
   if (world.adventure) run.label = `CHAPTER ${world.adventure.chapter + 1}<br>${world.adventure.iron} IRON`;
   // a Dungeon fight shows what is left of it under the depth
@@ -556,7 +639,10 @@ function roomLogic(dt) {
 
   let prompt = wildPrompt;
   const door = room.cleared && !room.pickups.some((k) => k.type !== 'shard') ? room.doorNear(p.pos) : null;
-  if (door?.kind === 'gate') {
+  // co-op: the host picks the door, once everyone has their reward
+  const hold = coop() && door ? (isGuest() ? 'THE HOST PICKS THE DOOR' : waitingOn().length ? `WAITING FOR ${waitingOn().map((n) => esc(n).toUpperCase()).join(', ')}` : null) : null;
+  if (hold) prompt = `<span class="dim">${hold}</span>`;
+  else if (door?.kind === 'gate') {
     prompt = run.keys ? `${btn('interact')}UNLOCK THE GATE` : `<span class="dim">NO KEY FOR THE LOCK.</span> ${btn('interact')}ACCEPT YOUR FATE`;
     if (pressed('interact')) {
       const escaped = run.keys > 0;
@@ -580,7 +666,7 @@ function roomLogic(dt) {
     }
   }
   const ch = room.chest;
-  if (ch && !ch.opened) {
+  if (ch && !ch.opened && !isGuest()) {
     ch.glow.position.y = 1.3 + Math.sin(performance.now() / 300) * 0.08;
     if (ch.pos.distanceTo(p.pos) < 1.8) {
       prompt = `${btn('interact')}OPEN THE CHEST`;
@@ -615,9 +701,10 @@ const WIKI_URL = 'https://dungeonwiki.pages.dev';
 const ACTION_NAME = { attack: 'Attack', special: 'Special', cast: 'Cast', dash: 'Dash', interact: 'Use', pause: 'Pause' };
 
 // which menu index each screen moves, so the mouse can drive it too
-const SEL_KEY = { home: 'home', playmenu: 'play', title: 'cls', anvil: 'anvil', choice: 'boon', pause: 'pause', settings: 'set', over: 'over' };
+const SEL_KEY = { lobby: 'lobby', home: 'home', playmenu: 'play', title: 'cls', anvil: 'anvil', choice: 'boon', pause: 'pause', settings: 'set', over: 'over' };
 const RENDER = {
   home: () => ui.homeScreen(menu.home, meta),
+  lobby: () => ui.lobbyScreen(menu.lobby ?? 0, lobbyView()),
   playmenu: () => { if (board === null) { board = []; loadBoard(); } return ui.playScreen(menu.play, meta, dailyInfo()); },
   title: () => ui.titleScreen(CLASS_IDS.map((id, i) => {
     const w = i === menu.cls ? shownWeapon() : equipped(id, meta);
@@ -898,6 +985,7 @@ const STATES = {
     if (card === 'tutorial') return beginTutorial();
     if (card === 'adventure') return startAdventure();
     if (card === 'daily') return startDaily();
+    if (card === 'coop') return enterLobby();
     menu.mode = card === 'open' ? 'open' : 'dungeon';
     if (menu.mode === 'dungeon') return enterKeep();
     menu.titleFrom = 'playmenu';
@@ -981,11 +1069,13 @@ const STATES = {
     updateEnemies(gdt);
     updateAllies(gdt);
     updateCombat(gdt);
+    netTick(gdt, p.dead || (world.state === 'play' && world.room.cleared && !world.room.pickups.some((k) => k.type !== 'shard') && !(world.run.pendingLevels > 0)));
     world.room.update(gdt);
     ui.updateHud(p, world.run, xpToNext(world.run.level));
     ui.updateEnemyBars(world.enemies);
     if (p.dead) {
       ui.setPrompt(null);
+      if (coop()) return coopDown(gdt);
       if (p.deathT > 0.6) endRun('dead');
       return;
     }
@@ -1023,9 +1113,37 @@ const STATES = {
     else { menu.settingsFrom = 'pause'; menu.set = 0; show('settings'); }
   },
 
+  lobby() {
+    const items = lobbyView().items;
+    menu.lobby = Math.min(menu.lobby ?? 0, items.length - 1);
+    if (navigate('lobby', items.length)) return RENDER.lobby();
+    if (pressed('back')) { leave(); return show('playmenu'); }
+    if (!confirmed()) return;
+    const pick = items[menu.lobby];
+    sfx('menu');
+    if (pick === 'Host a game') return hostGame();
+    if (pick === 'Join a game') return joinGame();
+    if (pick === 'Back') return show('playmenu');
+    if (pick === 'Leave') { leave(); return show('playmenu'); }
+    if (pick.startsWith('Class')) {
+      menu.cls = (menu.cls + 1) % CLASS_IDS.length;
+      newPlayer();
+      net.me = coopMe();
+      hello();
+      return RENDER.lobby();
+    }
+    if (pick === 'Start the run') {
+      menu.mode = 'coop';
+      net.inRun = true;
+      send({ t: 'start' });
+      startRun();
+    }
+  },
+
   over() {
     if (!confirmed()) return;
     if (world.adventure) return startAdventure(); // back to the start of the chapter you fell in
+    if (menu.mode === 'coop') return enterMenu('playmenu');
     if (menu.mode === 'dungeon') return enterKeep(); // a Dungeon run ends back in the Keep
     menu.titleFrom = 'playmenu';
     enterMenu('title');
@@ -1039,6 +1157,7 @@ export function frame(dt) {
   STATES[world.state](dt);
   menu.click = false;
   updateTouch(world);
+  updateTags(world.remotes ?? []);
   // menu backdrops: keep the heroes breathing
   if (['home', 'playmenu', 'title', 'anvil', 'settings', 'codex'].includes(world.state)) {
     world.player?.model.anim.loop('idle');
@@ -1047,7 +1166,8 @@ export function frame(dt) {
   }
   // lean the camera a fifth of the way toward the arena's middle, so the edges show less void
   // on the home screen the camera sits left of the character, so they stand clear of the menu
-  const target = world.state === 'home' ? world.player?.pos.clone().addScaledVector(GROUND_RIGHT, -3.2) : world.room && !['wild', 'field'].includes(world.room.plan.kind) ? world.player?.pos.clone().lerp(world.room.center, 0.2) : world.player?.pos;
+  const hero = coop() && world.player?.dead ? (aliveRemote() ?? world.player) : world.player;
+  const target = world.state === 'home' ? world.player?.pos.clone().addScaledVector(GROUND_RIGHT, -3.2) : world.room && !['wild', 'field'].includes(world.room.plan.kind) ? hero?.pos.clone().lerp(world.room.center, 0.2) : hero?.pos;
   if (target) updateCamera(dt, target);
   updateLights(dt, performance.now() / 1000);
 }

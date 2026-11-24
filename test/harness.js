@@ -313,7 +313,7 @@ export async function fullRun(maxRooms = 14) {
 export async function tutorial() {
   const results = [], t = () => W.tutorial;
   await toPlayMenu();
-  clickSel(4); // Tutorial
+  clickSel(5); // Tutorial
   await waitFor('play');
   for (let i = 0; i < 50 && !W.tutorial; i++) await sleep(100); // it starts once the fade-in finishes
   check(results, 'tutorial starts', !!W.tutorial, W.room?.plan.kind);

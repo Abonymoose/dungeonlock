@@ -133,7 +133,7 @@ export async function all() {
   W.player.hp = 0; W.player.dead = true;
   T.step(2);
   await T.toPlayMenu();
-  T.clickSel(4); // Tutorial
+  T.clickSel(5); // Tutorial
   await T.waitFor('play');
   for (let i = 0; i < 50 && !W.tutorial; i++) await T.sleep(100);
   T.step(1.2);

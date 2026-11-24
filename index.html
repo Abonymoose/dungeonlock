@@ -213,6 +213,32 @@
   .pcards { flex-wrap: nowrap; width: 100%; }
   .pcard { flex: 0 1 calc(var(--u) * 92); min-width: 0; }
   .pcard.daily .art img { filter: hue-rotate(-25deg) saturate(1.4) brightness(0.9); }
+  .pcard.coop .art img { filter: hue-rotate(160deg) saturate(1.2) brightness(0.85); }
+  /* co-op: the room code, and the players in the room */
+  .roomcode { font-size: 1.1em; letter-spacing: 0.2em; color: var(--oak); }
+  .roomcode b { font-size: 1.8em; color: var(--sand); font-weight: normal; margin-left: 0.4em; }
+  .list.lobby { min-width: calc(var(--u) * 120); }
+  /* names, health and emojis over heroes; the chat feed; the phone chat button */
+  #tags { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+  .ptag { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 1); }
+  .ptag .pname, .ptag .php { display: none; }
+  .ptag.remote .pname { display: block; font-size: 0.55em; color: var(--sand); text-shadow: var(--u) var(--u) 0 var(--onyx); }
+  .ptag.remote .php { display: block; width: calc(var(--u) * 14); height: calc(var(--u) * 2); background: var(--onyx); box-shadow: 0 0 0 var(--u) var(--onyx); }
+  .ptag .php i { display: block; height: 100%; background: #46C2A8; }
+  .ptag.down .pname { color: var(--crimson); }
+  .ptag .bubble { font-size: 2.6em; line-height: 1; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; filter: drop-shadow(var(--u) var(--u) 0 var(--onyx)); }
+  .ptag .bubble.pop { animation: pop 0.25s ease-out; }
+  @keyframes pop { from { transform: scale(0.3); } 70% { transform: scale(1.25); } }
+  #chatfeed { position: fixed; left: calc(var(--u) * 10); top: calc(var(--u) * 10); z-index: 3; pointer-events: none; font-size: 0.75em; display: flex; flex-direction: column; gap: calc(var(--u) * 2); text-shadow: var(--u) var(--u) 0 var(--onyx); }
+  #chatfeed div { transition: opacity 0.5s; font-family: inherit; }
+  #chatfeed div.gone { opacity: 0; }
+  #chatfeed b { font-weight: normal; color: var(--oak); margin-right: 0.4em; }
+  #chatfeed .emo { font-size: 1.8em; vertical-align: middle; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; }
+  #emotebtn { position: fixed; right: calc(var(--u) * 6); top: calc(var(--u) * 26); z-index: 6; font-size: 1.4em; width: 1.8em; height: 1.8em; display: flex; align-items: center; justify-content: center; background: rgba(19, 21, 21, 0.7); box-shadow: 0 0 0 var(--u) var(--choc); font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; }
+  #emotepanel { position: fixed; right: calc(var(--u) * 6); top: calc(var(--u) * 40); z-index: 6; display: grid; grid-template-columns: repeat(5, 1fr); gap: calc(var(--u) * 2); padding: calc(var(--u) * 3); background: rgba(19, 21, 21, 0.9); box-shadow: 0 0 0 var(--u) var(--choc); }
+  #emotepanel span { position: relative; font-size: 1.4em; width: 1.6em; height: 1.6em; display: flex; align-items: center; justify-content: center; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; cursor: pointer; }
+  #emotepanel small { position: absolute; right: 0; bottom: 0; font-size: 0.35em; color: var(--oak); font-family: inherit; }
+  @media (prefers-reduced-motion: reduce) { .ptag .bubble.pop { animation: none; } }
   .pcard .board { margin: 0.6em 0 0; padding-left: 1.4em; font-size: 0.6em; line-height: 1.7; color: var(--sand); }
   .padlock {
     position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 1;

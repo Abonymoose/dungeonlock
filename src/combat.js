@@ -11,7 +11,8 @@ const projectiles = [], telegraphs = [], effects = [], texts = [], trails = [];
 const fxLayer = document.getElementById('fx');
 const tmp = new THREE.Vector3(), guardV = new THREE.Vector3();
 
-// Filled in by boons.js, so combat never imports the boon system: dmgMult, crit, onHit, onCast, onDash, playerHurt, onKill
+// Filled in by boons.js, so combat never imports the boon system: dmgMult, crit, onHit, onCast, onDash, playerHurt, onKill.
+// net.js adds onTelegraph, onShot, remoteHurt and puppetHit for co-op.
 export const hooks = {};
 
 // ---- entities ----
@@ -27,7 +28,7 @@ export function makeEntity(model, { team, hp, radius = 0.35, speed = 3, armor = 
 
 export const opponents = (team) => team === 0
   ? world.enemies.filter((e) => !e.dead)
-  : (world.player && !world.player.dead ? [world.player] : []);
+  : [world.player, ...(world.remotes ?? [])].filter((x) => x && !x.dead);
 
 function perfectDodge(p) {
   p.dodgeCd = 0.6;
@@ -76,13 +77,15 @@ export function heal(e, amount) {
 }
 
 // tag says which move dealt it (attack, special, cast, dash, status...) so boons can react; quiet skips the juice (burn ticks)
-export function damage(target, amount, from, { knockback = 0, stun = 0, crit = false, heavy = false, source = null, tag = null, quiet = false, color = null } = {}) {
+export function damage(target, amount, from, { knockback = 0, stun = 0, crit = false, heavy = false, source = null, tag = null, quiet = false, color = null, raw = false } = {}) {
   if (target.dead) return false;
+  // co-op: another player's hero takes the hit on their own machine
+  if (target.remote) { hooks.remoteHurt?.(target, amount, from, { knockback, stun }); return true; }
   if (target.invuln > 0) {
     if (target.team === 0 && source?.team === 1 && (target.sinceDash ?? 9) < 0.35 && !(target.dodgeCd > 0)) perfectDodge(target);
     return false;
   }
-  const byPlayer = target.team === 1 && (source?.team === 0 || tag === 'status');
+  const byPlayer = !raw && target.team === 1 && (source?.team === 0 || tag === 'status');
   if (byPlayer && world.player?.dodgeT > 0) amount *= 1.5;
   if (byPlayer && hooks.dmgMult) amount *= hooks.dmgMult(target, tag);
   if (byPlayer && !crit && hooks.crit) { const c = hooks.crit(target, tag); if (c > 1) { amount *= c; crit = true; } }
@@ -93,9 +96,12 @@ export function damage(target, amount, from, { knockback = 0, stun = 0, crit = f
   if (target.team === 0 && world.run) world.run.hurt = true;
   if (target.team === 0 && source?.affix === 'vampiric' && !source.dead) heal(source, amount * 2); // it drinks what it takes
   // a shieldbearer takes a fifth of any hit that comes from in front of it
-  if (target.guard && from && guardV.subVectors(from, target.pos).setY(0).dot(target.facing) > 0.3 * guardV.length()) { amount *= 0.2; floatText(target.pos, 'BLOCK', 'status'); }
-  amount = Math.max(1, Math.round(amount * (1 - target.armor)));
+  if (!raw && target.guard && from && guardV.subVectors(from, target.pos).setY(0).dot(target.facing) > 0.3 * guardV.length()) { amount *= 0.2; floatText(target.pos, 'BLOCK', 'status'); }
+  amount = Math.max(1, Math.round(raw ? amount : amount * (1 - target.armor)));
+  // co-op guest: the host keeps the real health of its enemies; ours only shows the hit until it says otherwise
+  if (target.puppet) hooks.puppetHit?.(target, amount, from, { knockback, stun, tag, quiet });
   target.hp -= amount;
+  if (target.puppet && target.hp < 1) target.hp = 1;
   target.onHurt?.(tag); // the tutorial counts hits through this
   if (quiet) {
     if (settings.numbers && target.type !== 'dummy') floatText(target.pos, String(amount), color ?? 'hit');
@@ -154,12 +160,14 @@ export function meleeArc(owner, { range, arc, damage: dmg, knockback = 4, stun =
   return hits;
 }
 
-export function fireProjectile({ owner, dir, pos = owner.pos, speed = 12, damage: dmg, range = 10, size = 0.14, color, knockback = 2, stun = 0, pierce = false, onHit = null, onExpire = null, tag = null }) {
+// cosmetic: a bolt drawn for show (a co-op host's, on a guest's screen); it hits nothing
+export function fireProjectile({ owner, dir, pos = owner.pos, speed = 12, damage: dmg, range = 10, size = 0.14, color, knockback = 2, stun = 0, pierce = false, onHit = null, onExpire = null, tag = null, cosmetic = false }) {
   if (owner.ally) color = ALLY_GREEN;
+  if (!cosmetic && owner.team === 1) hooks.onShot?.({ pos, dir, speed, size, range, color });
   const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(size), basic(color));
   mesh.position.set(pos.x, 0.55, pos.z);
   scene.add(mesh);
-  const shot = { owner, team: owner.team, mesh, dir: dir.clone().setY(0).normalize(), speed, dmg, life: range / speed, radius: size + 0.05, knockback, stun, pierce, hit: new Set(), onHit, onExpire, tag };
+  const shot = { owner, team: owner.team, mesh, dir: dir.clone().setY(0).normalize(), speed, dmg, life: range / speed, radius: size + 0.05, knockback, stun, pierce, hit: new Set(), onHit, onExpire, tag, cosmetic };
   projectiles.push(shot);
   addTrail(() => (shot.gone ? undefined : mesh.position), color, size * 1.8);
   sfx('shoot');
@@ -179,7 +187,8 @@ export function aoe(owner, { pos, radius, damage: dmg, knockback = 6, stun = 0, 
 
 // Crimson ground warning that fills up, then fires. Cancelled if its owner dies or is stunned: that's the opening.
 export const ALLY_GREEN = 0x9ff08a;
-export function telegraph({ owner = null, shape, pos, dir = null, radius = 1, arc = Math.PI, length = 6, width = 0.5, duration, onDone, onCancel }) {
+export function telegraph({ owner = null, shape, pos, dir = null, radius = 1, arc = Math.PI, length = 6, width = 0.5, duration, onDone, onCancel, cosmetic = false }) {
+  hooks.onTelegraph?.({ owner, shape, pos, dir, radius, arc, length, width, duration, cosmetic });
   const group = new THREE.Group();
   group.position.set(pos.x, 0.03, pos.z);
   const geo = shape === 'line'
@@ -290,7 +299,7 @@ export function updateCombat(dt) {
     p.mesh.position.addScaledVector(p.dir, p.speed * dt);
     p.mesh.rotation.y += dt * 12;
     let gone = p.life <= 0 || world.room?.blocked(p.mesh.position);
-    for (const t of opponents(p.team)) {
+    for (const t of p.cosmetic ? [] : opponents(p.team)) {
       if (gone || p.hit.has(t)) continue;
       tmp.subVectors(t.pos, p.mesh.position).setY(0);
       if (tmp.length() > t.radius + p.radius) continue;

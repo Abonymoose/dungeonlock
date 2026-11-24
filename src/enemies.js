@@ -71,11 +71,12 @@ export function spawnEnemy(type, x, z, depth, elite = false) {
   });
 }
 
-function create(type, x, z, depth, elite = false) {
+let netSeq = 0; // co-op: each enemy has an id the guests know it by
+function create(type, x, z, depth, elite = false, affix = null) {
   const T = TYPES[type];
   const e = makeEntity(T.model(), { team: 1, hp: Math.round(T.hp * (1 + depth * 0.08 + Math.max(0, depth - 10) * 0.05) * (settings.hardcore ? 1.5 : 1) * (world.run?.curse?.id === 'iron' ? 1.4 : 1) * (world.run?.vows?.includes('iron') ? 1.4 : 1)), radius: T.radius, speed: T.speed * (1 + Math.min(depth, 40) * 0.008) * (world.run?.vows?.includes('swift') ? 1.25 : 1), armor: T.armor ?? 0 });
   Object.assign(e, {
-    type, T, depth, state: 'recover', timer: 0.4 + Math.random() * 0.6, phase: 0, swingT: 0, walkT: 0, deadT: 0,
+    type, T, depth, state: 'recover', timer: 0.4 + Math.random() * 0.6, phase: 0, swingT: 0, walkT: 0, deadT: 0, netId: ++netSeq,
     knockResist: T.knockResist ?? 1, stunResist: T.stunResist ?? 1, guard: !!T.guard,
   });
   e.pos.set(x, 0, z);
@@ -87,7 +88,7 @@ function create(type, x, z, depth, elite = false) {
     e.armor = Math.min(0.5, e.armor + 0.15);
     e.model.root.scale.setScalar(1.2);
     for (const m of e.model.mats) m.color.lerp(new THREE.Color(C.CRIMSON), 0.25);
-    e.affix = Object.keys(AFFIXES)[Math.floor(Math.random() * 4)];
+    e.affix = AFFIXES[affix] ? affix : Object.keys(AFFIXES)[Math.floor(Math.random() * 4)];
     if (e.affix === 'swift') e.speed *= 1.4;
     if (e.affix === 'ironclad') { e.armor = Math.min(0.6, e.armor + 0.2); e.knockResist *= 0.4; }
     floatText(e.pos, AFFIXES[e.affix].name.toUpperCase(), 'status');
@@ -105,7 +106,7 @@ function onDeath(e) {
   const run = world.run, p = world.player;
   if (e.type === 'gravelord' && !e.burned) earn('gravelord');
   // a volatile elite goes off a moment after it falls
-  if (e.affix === 'volatile' || e.T.burst) {
+  if ((e.affix === 'volatile' || e.T.burst) && !e.puppet) {
     const at = e.pos.clone();
     telegraph({ shape: 'circle', pos: at, radius: 2.0, duration: 0.6, onDone: () => { aoe(e, { pos: at, radius: 2.0, damage: 14 + e.depth, knockback: 8 }); sfx('slam'); } });
   }
@@ -128,6 +129,13 @@ function onDeath(e) {
   for (let k = 0; k < (e.shards ?? 0); k++) world.room.addPickup('shard', e.pos.x + (Math.random() - 0.5) * 0.6, e.pos.z + (Math.random() - 0.5) * 0.6);
   burst(e.pos, C.OAK, 14);
   sfx('kill');
+}
+
+// Co-op guest: an enemy that lives on the host's machine, drawn here and steered to where the host says it is
+export function createPuppet(type, netId, x, z, depth, elite, affix) {
+  const e = create(type, x, z, depth, elite, affix);
+  Object.assign(e, { puppet: true, netId, netX: x, netZ: z, netRy: 0 });
+  return e;
 }
 
 // Raises one of the dead on your side for a while. At most four stand at once; the oldest crumbles first.
@@ -174,6 +182,16 @@ export function bossOf(enemies) {
   return enemies.find((e) => e.T.boss && !e.dead) ?? null;
 }
 
+function nearestHero(e) {
+  let best = null, d = Infinity;
+  for (const h of [world.player, ...(world.remotes ?? [])]) {
+    if (!h || h.dead) continue;
+    const k = h.pos.distanceToSquared(e.pos);
+    if (k < d) { d = k; best = h; }
+  }
+  return best;
+}
+
 export function updateEnemies(dt) {
   const p = world.player;
   for (let i = world.enemies.length - 1; i >= 0; i--) {
@@ -190,9 +208,19 @@ export function updateEnemies(dt) {
     updateStatus(e, dt);
     if (e.dead) continue; // a burn tick can finish it off
     tickEntity(e, dt);
+    if (e.puppet) {
+      // slide toward where the host has it, turned the way it faces there
+      e.vel.set(e.netX - e.pos.x, 0, e.netZ - e.pos.z).multiplyScalar(8);
+      if (e.vel.length() > 30) { e.pos.set(e.netX, e.pos.y, e.netZ); e.vel.set(0, 0, 0); }
+      e.facing.set(Math.sin(e.netRy), 0, Math.cos(e.netRy));
+      moveEntity(e, dt);
+      animate(e, dt);
+      continue;
+    }
     e.vel.set(0, 0, 0);
+    const target = nearestHero(e) ?? (p && !p.dead ? p : null);
     if (e.stun > 0) e.state = 'recover';
-    else if (p && !p.dead) e.T.think(e, p, dt);
+    else if (target) e.T.think(e, target, dt);
     moveEntity(e, dt);
     animate(e, dt);
   }

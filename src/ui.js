@@ -131,6 +131,7 @@ const CARDS = [
   { id: 'dungeon', name: 'Dungeon', desc: 'Pick a class and descend. It gets harder the deeper you go.', art: 'card-dungeon' },
   { id: 'open', name: 'Open World', desc: 'Beta. A huge wild island. Gather and craft by day; zombies rise at night. How many nights can you last?', art: 'card-open' },
   { id: 'adventure', name: 'Adventure', desc: 'A story in eight chapters. You are a village swordsmith, and the princess is held in the castle. No magic: one sword.', art: 'card-adventure' },
+  { id: 'coop', name: 'Co-op', desc: 'Up to four players, one dungeon. Host a room and share its code, or join a friend\'s. Number keys send emojis.', art: 'card-dungeon', css: 'coop' },
   { id: 'daily', name: 'Daily Run', desc: '', art: 'card-dungeon', css: 'daily' },
   { id: 'tutorial', name: 'Tutorial', desc: 'Learn to move, fight, cast and take boons in one quiet room.', art: 'card-tutorial' },
 ];
@@ -249,6 +250,20 @@ export function overScreen(result) {
       ${result.feats ? `<div class="item"><span>Feats earned</span><span>${result.feats}</span></div>` : ''}
     </div>
     <div class="hints"><span data-sel="0">${btn('confirm')}Continue</span></div>`);
+}
+
+// Co-op lobby. v: { code, host, players: [{ name, cls, host, me }], items: [labels], msg }
+export function lobbyScreen(sel, v) {
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const items = v.items.map((t, i) => `<div class="item ${i === sel ? 'sel' : ''}" data-sel="${i}"><span>${t}</span></div>`).join('');
+  const who = v.players.map((p) => `<div class="item"><span>${esc(p.name)}${p.me ? ' <span class="dim">(you)</span>' : ''}</span><span>${esc(p.cls)}${p.host ? ' <span class="dim">host</span>' : ''}</span></div>`).join('');
+  showScreen(`
+    <h2>Co-op</h2>
+    ${v.code ? `<div class="roomcode">ROOM <b>${esc(v.code)}</b></div><div class="tag">${v.host ? 'Share this code. Start when everyone is in.' : 'Waiting for the host to start.'}</div>` : '<div class="tag">Up to four players in one Dungeon run. The host picks the doors.</div>'}
+    ${v.code ? `<div class="panel list lobby">${who}</div>` : ''}
+    <div class="list">${items}</div>
+    ${v.msg ? `<p class="red">${esc(v.msg)}</p>` : ''}
+    <div class="hints"><span>${btn('confirm')}Select</span><span>${btn('back')}${v.code ? 'Leave' : 'Back'}</span></div>`);
 }
 
 // rows: [{ group?, name, note?, value }] built by main from the settings
