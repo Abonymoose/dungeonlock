@@ -3,7 +3,7 @@ import { C } from './config.js';
 import { world } from './world.js';
 import { input, pressed, isHeld, rumble } from './input.js';
 import { GROUND_RIGHT, GROUND_UP, basic, flashLight, screenToGround } from './render.js';
-import { makeKnight, makeRogue, makeWizard, makeBarbarian, makeNecromancer, makeSmith } from './models.js';
+import { makeKnight, makeRogue, makeWizard, makeBarbarian, makeNecromancer } from './models.js';
 import { summonAlly } from './enemies.js';
 import { hooks, makeEntity, meleeArc, fireProjectile, aoe, spawnGhost, addTrail, moveEntity, tickEntity, turnToward, opponents, damage, heal } from './combat.js';
 import { sfx } from './audio.js';
@@ -266,19 +266,6 @@ export const equipped = (id, meta) => WEAPONS[id].find((w) => w.id === meta.gear
 // a class with a weapon in hand: the weapon's moves over the class's
 export const armed = (id, w) => ({ ...CLASSES[id], attack: w.attack ?? CLASSES[id].attack, special: w.special ?? CLASSES[id].special, ranged: w.ranged ?? CLASSES[id].ranged, weapon: w });
 
-// Adventure mode's hero, kept apart from the classes so he never shows on class select.
-// Grounded: one honest swing with a windup, and one short step. No Cast, no Special, no long dash.
-export const SMITH = {
-  name: 'Swordsmith', blurb: 'A village smith with a sword he made himself.', hp: 60, speed: 4.2, armor: 0, model: makeSmith, swingAxis: 'y', grounded: true,
-  attack: {
-    name: 'Swing', cd: 0.62, windup: 0.18, desc: 'One heavy swing',
-    use: (p) => meleeArc(p, { range: 1.55 + (p.reach ?? 0), arc: 1.8, damage: 24 * p.mods.atk, knockback: 6, tag: 'attack' }),
-  },
-  special: null,
-  dash: { name: 'Step', speed: 8.5, time: 0.14, cd: 0.7, charges: 1, step: true, invuln: 0.06 },
-  passive: 'No magic. Every hit counts',
-};
-
 // Cast, shared by every class like Hades' bloodstone: a limited shard that lodges in a foe
 // and drops when it dies, so you have to go get it back.
 export const CAST = { name: 'Lock Shard', desc: 'Throw a shard that sticks in a foe. Pick it back up.' };
@@ -293,8 +280,7 @@ function cast(p) {
 }
 
 export function createPlayer(id, meta, weapon = null) {
-  const cls = id === 'smith' ? SMITH : armed(id, weapon ?? WEAPONS[id][0]);
-  if (cls.grounded) meta = { vitality: 0, whetstone: 0, shards: -2, quickstep: 0 }; // the Anvil's upgrades are for the dungeon; his come from his own forge
+  const cls = armed(id, weapon ?? WEAPONS[id][0]);
   const model = cls.model(cls.weapon);
   // x-ray silhouette: draws only where something stands in front of the player, so you never lose them
   const xray = basic(C.SAND, { transparent: true, opacity: 0.45, depthFunc: THREE.GreaterDepth, depthWrite: false });
@@ -418,14 +404,7 @@ export function updatePlayer(p, dt) {
 
   // hold attack to keep swinging; special is one press per use
   const reach = cls.ranged ? 10 : 3;
-  if (cls.attack.windup && isHeld('attack') && p.atkCd <= 0 && !busy) {
-    // the swordsmith: draw back, then cut. The blow lands after the windup, so timing matters.
-    p.atkCd = cls.attack.cd * p.mods.atkCd;
-    p.attackLock = cls.attack.windup + 0.28;
-    assist(p, reach);
-    p.swingIn = cls.attack.windup;
-    p.model.anim.once('attack', cls.attack.cd);
-  } else if (!cls.attack.windup && isHeld('attack') && p.atkCd <= 0 && !busy) {
+  if (isHeld('attack') && p.atkCd <= 0 && !busy) {
     p.atkCd = cls.attack.cd * p.mods.atkCd;
     p.attackLock = 0.12;
     assist(p, reach);
@@ -439,15 +418,14 @@ export function updatePlayer(p, dt) {
     p.model.anim.once(fin && p.model.anim.has('attack2') ? 'attack2' : 'attack', Math.max(0.28, cls.attack.cd * p.mods.atkCd * (fin ? 1.5 : 1.1)));
     sfx('swing');
   }
-  if (p.swingIn > 0 && (p.swingIn -= dt) <= 0) { cls.attack.use(p, { fin: false, mult: 1 }); sfx('swing'); }
-  if (!cls.grounded && pressed('cast') && p.ammo > 0 && !busy) {
+  if (pressed('cast') && p.ammo > 0 && !busy) {
     assist(p, 11);
     cast(p);
     p.attackLock = 0.15;
     p.model.anim.once('throw', 0.35);
     sfx('special');
   }
-  if (!cls.grounded && pressed('special') && p.spcCd <= 0 && !busy) {
+  if (pressed('special') && p.spcCd <= 0 && !busy) {
     p.spcCd = cls.special.cd * p.mods.spcCd;
     assist(p, reach * 2);
     cls.special.use(p);

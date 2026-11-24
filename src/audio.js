@@ -57,7 +57,7 @@ export function sfx(name) {
 
 // ---- music: CC0 tracks in assets/music, one per part of the game (credits in assets/music/LICENSE.txt).
 // Where a browser can't play a file (Safari and .ogg), the old drone-and-bells plays instead, keyed to the biome.
-const TRACKS = { dungeon: 'dungeon.ogg', boss: 'boss.ogg', vaults: 'vaults.ogg', keep: 'keep.ogg', wilds: 'wilds.mp3', adventure: 'adventure.mp3' };
+const TRACKS = { dungeon: 'dungeon.ogg', boss: 'boss.ogg', vaults: 'vaults.ogg', keep: 'keep.ogg' };
 const playable = (file) => !!document.createElement('audio').canPlayType(file.endsWith('.ogg') ? 'audio/ogg; codecs="vorbis"' : 'audio/mpeg');
 let track = null, wanted = null, droneBus = null;
 

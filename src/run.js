@@ -260,7 +260,7 @@ export function rollDoors(depth, run) {
 
 // ---- XP levels within a run ----
 
-export const XP_FOR = { zombie: 2, crawler: 3, bloater: 6, grunt: 3, hexer: 4, stalker: 5, sapper: 3, whirler: 7, slinger: 4, shieldbearer: 6, bonecaller: 6, brute: 9, warden: 40, prior: 40, reaver: 40, drowned: 4, tidecaller: 5, lurker: 6, drownedking: 50, gravelord: 40, cinderling: 3, smelter: 5, anvilback: 8, forgemaster: 60 };
+export const XP_FOR = { grunt: 3, hexer: 4, stalker: 5, sapper: 3, whirler: 7, slinger: 4, shieldbearer: 6, bonecaller: 6, brute: 9, warden: 40, prior: 40, reaver: 40, drowned: 4, tidecaller: 5, lurker: 6, drownedking: 50, cinderling: 3, smelter: 5, anvilback: 8, forgemaster: 60 };
 export const xpToNext = (level) => 10 + (level - 1) * 8;
 
 export const PERKS = [

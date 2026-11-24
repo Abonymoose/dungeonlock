@@ -129,8 +129,6 @@ export function homeScreen(sel, meta) {
 // The ways in, as red cards with a scene rendered from the game
 const CARDS = [
   { id: 'dungeon', name: 'Dungeon', desc: 'Pick a class and descend. It gets harder the deeper you go.', art: 'card-dungeon' },
-  { id: 'open', name: 'Open World', desc: 'Beta. A huge wild island. Gather and craft by day; zombies rise at night. How many nights can you last?', art: 'card-open' },
-  { id: 'adventure', name: 'Adventure', desc: 'A story in eight chapters. You are a village swordsmith, and the princess is held in the castle. No magic: one sword.', art: 'card-adventure' },
   { id: 'coop', name: 'Co-op', desc: 'Up to four players, one dungeon. Host a room and share its code, or join a friend\'s. Number keys send emojis.', art: 'card-dungeon', css: 'coop' },
   { id: 'daily', name: 'Daily Run', desc: '', art: 'card-dungeon', css: 'daily' },
   { id: 'tutorial', name: 'Tutorial', desc: 'Learn to move, fight, cast and take boons in one quiet room.', art: 'card-tutorial' },
@@ -146,7 +144,6 @@ export function playScreen(sel, meta, daily) {
         <p>${c.id === 'daily' ? `The same dungeon for everyone today: ${daily.cls}, ${daily.vow}, no Anvil. Best score goes on the board.` : c.desc}</p>
         ${c.id === 'daily' && daily.board?.length ? `<ol class="board">${daily.board.map((b) => `<li>${b}</li>`).join('')}</ol>` : ''}
         ${c.id === 'tutorial' && meta.tutorialDone ? '<p class="done">Completed</p>' : ''}
-        ${c.id === 'adventure' && meta.adventure ? `<p class="done">Continue: Chapter ${meta.adventure.chapter + 1}</p>` : c.id === 'adventure' && meta.adventureDone ? '<p class="done">Completed</p>' : ''}
       </div>
     </div>`).join('');
   showScreen(`
@@ -226,7 +223,7 @@ export function pauseScreen(sel, cls, cast, leave = 'Abandon run', boons = []) {
     <div class="pausewrap">
       <div class="panel moves">
         ${moveRow('attack', cls.attack.name, cls.attack.desc)}${cls.special ? moveRow('special', cls.special.name, cls.special.desc) : ''}
-        ${cls.grounded ? '' : moveRow('cast', cast.name, cast.desc)}${moveRow('dash', cls.dash.name)}${moveRow('interact', 'Use')}
+        ${moveRow('cast', cast.name, cast.desc)}${moveRow('dash', cls.dash.name)}${moveRow('interact', 'Use')}
       </div>${carried}
     </div>`);
 }
@@ -236,13 +233,12 @@ export function overScreen(result) {
     trapped: ['NOT EVERYTHING UNLOCKS', 'No key for the Lock. The dungeon keeps you.'],
     dead: ['FALLEN', 'The dungeon remembers. So do you.'],
     abandoned: ['ABANDONED', 'You let the dark take you.'] };
-  const [t, sub] = result.adventure ? ['FALLEN', `Back to the start of ${result.adventure}. Your forge work is kept.`]
-    : result.wild && result.kind === 'dead' ? ['FALLEN', 'The Wilds take another.'] : titles[result.kind];
+  const [t, sub] = titles[result.kind];
   showScreen(`
     <h1>${t}</h1><div class="tag">${sub}</div>
     <div class="panel list">
       <div class="item"><span>Class</span><span>${result.className}${result.weapon ? `, ${result.weapon}` : ''}</span></div>
-      <div class="item"><span>${result.adventure ? 'Chapter' : result.wild ? 'Nights survived' : 'Depth'}</span><span>${result.depth}</span></div>
+      <div class="item"><span>Depth</span><span>${result.depth}</span></div>
       <div class="item"><span>Kills</span><span>${result.kills}</span></div>
       <div class="item"><span>Ash banked</span><span>${result.ash}</span></div>
       ${result.time ? `<div class="item"><span>Time</span><span>${result.time}</span></div>` : ''}
@@ -252,16 +248,18 @@ export function overScreen(result) {
     <div class="hints"><span data-sel="0">${btn('confirm')}Continue</span></div>`);
 }
 
-// Co-op lobby. v: { code, host, players: [{ name, cls, host, me }], items: [labels], msg }
+// Co-op lobby. v: { code, host, players: [{ name, cls, weapon, color, icon, img, host, me }], items: [{ id, label (html), cycle }], msg }
 export function lobbyScreen(sel, v) {
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-  const items = v.items.map((t, i) => `<div class="item ${i === sel ? 'sel' : ''}" data-sel="${i}"><span>${t}</span></div>`).join('');
-  const who = v.players.map((p) => `<div class="item"><span>${esc(p.name)}${p.me ? ' <span class="dim">(you)</span>' : ''}</span><span>${esc(p.cls)}${p.host ? ' <span class="dim">host</span>' : ''}</span></div>`).join('');
+  const items = v.items.map((t, i) => `<div class="item ${t.cycle ? 'cycle' : ''} ${i === sel ? 'sel' : ''}" data-sel="${i}"><span>${t.cycle && i === sel ? '&lsaquo; ' : ''}${t.label}${t.cycle && i === sel ? ' &rsaquo;' : ''}</span></div>`).join('');
+  const who = v.players.map((p) => `<div class="lp" style="--c:${p.color}"><img src="assets/shots/${p.img}.png" alt=""><div><b><span class="emo">${p.icon}</span>${esc(p.name)}</b>${p.me ? ' <span class="dim">(you)</span>' : ''}${p.host ? ' <span class="dim">host</span>' : ''}<small>${esc(p.cls)}, ${esc(p.weapon)}</small></div></div>`).join('');
   showScreen(`
     <h2>Co-op</h2>
     ${v.code ? `<div class="roomcode">ROOM <b>${esc(v.code)}</b></div><div class="tag">${v.host ? 'Share this code. Start when everyone is in.' : 'Waiting for the host to start.'}</div>` : '<div class="tag">Up to four players in one Dungeon run. The host picks the doors.</div>'}
-    ${v.code ? `<div class="panel list lobby">${who}</div>` : ''}
-    <div class="list">${items}</div>
+    <div class="lobbywrap">
+      <div class="list profile">${items}</div>
+      ${v.code ? `<div class="panel lobby">${who}</div>` : ''}
+    </div>
     ${v.msg ? `<p class="red">${esc(v.msg)}</p>` : ''}
     <div class="hints"><span>${btn('confirm')}Select</span><span>${btn('back')}${v.code ? 'Leave' : 'Back'}</span></div>`);
 }
@@ -294,7 +292,6 @@ export function scrollCodex(dy) { const el = screen.querySelector('.codex'); if 
 // Step-by-step panel at the top of the screen during the tutorial
 const tut = $('#tutorial');
 // A line of story at the bottom of the screen: who speaks, what they say, and how to go on
-const talkEl = $('#talk');
 const toastEl = document.getElementById('toast');
 let toastTimer = 0;
 export function toast(html) {
@@ -302,11 +299,6 @@ export function toast(html) {
   toastEl.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toastEl.classList.remove('show'), 3600);
-}
-
-export function dialogue(line) {
-  talkEl.classList.toggle('hidden', !line);
-  if (line) set(talkEl, `${line[0] ? `<div class="who">${line[0]}</div>` : ''}<p>${line[1]}</p><div class="next">${btn('confirm')}</div>`);
 }
 
 export function tutorialPanel(s) {

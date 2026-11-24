@@ -1,11 +1,9 @@
-import { CLASSES, CAST, SMITH, WEAPONS } from './classes.js';
+import { CLASSES, CAST, WEAPONS } from './classes.js';
 import { BESTIARY, AFFIXES } from './enemies.js';
 import { PATRONS, BOONS, describe } from './boons.js';
 import { PERKS, UPGRADES } from './run.js';
 import { settings, ACTIONS } from './settings.js';
 import { keyName, padName } from './input.js';
-import { RECIPES, costText } from './wild.js';
-import { CHAPTERS, FORGE, FORGE_MAX } from './adventure.js';
 import { FEATS, hasFeat } from './feats.js';
 
 // The encyclopedia, built from the game's own data so it can't go out of date.
@@ -22,21 +20,19 @@ const feats = (mine) => entry('Feats', `<p>One-time goals in every mode. Each pa
   `<li><b>${mine && hasFeat(f.id) ? '&#9670; ' : ''}${f.name}</b> (${f.ash} ash): ${f.desc}</li>`).join('')}</ul>`);
 export const FEATS_WIKI = () => feats(false);
 
-// a grounded class (the swordsmith) has no special and no cast
 const classEntry = (c, img) => entry(c.name, `
     <p>${c.blurb}</p>
     <p class="stat">Health ${c.hp}, speed ${c.speed}. ${c.passive}.</p>
     <dl>
       <dt>Attack</dt><dd>${c.attack.name}. ${c.attack.desc}.</dd>
       ${c.special ? `<dt>Special</dt><dd>${c.special.name}. ${c.special.desc}.</dd>` : ''}
-      ${c.grounded ? '' : `<dt>Cast</dt><dd>${CAST.name}. ${CAST.desc}</dd>`}
+      <dt>Cast</dt><dd>${CAST.name}. ${CAST.desc}</dd>
       <dt>Dash</dt><dd>${c.dash.name}${c.dash.charges > 1 ? `, ${c.dash.charges} charges` : ''}.</dd>
     </dl>`, null, img);
 const foe = (e, growth) => entry(e.boss ? `${e.name}, ${e.title}` : e.name, `<p>${e.about}</p><p class="stat">${e.boss ? 'Boss. ' : ''}Base health ${e.hp}, ${growth}</p>`, e.boss ? 'var(--crimson)' : null, 'enemy-' + e.id);
 const dungeonGrowth = (e) => `rising with depth.${e.boss ? '' : ' Elites are bigger, armored and tinted crimson.'}`;
 const foes = (ids, growth) => BESTIARY.filter((e) => ids.includes(e.id)).map((e) => foe(e, typeof growth === 'function' ? growth(e) : growth)).join('');
-const WILDS_FOES = ['zombie', 'crawler', 'bloater', 'gravelord'], STORY_FOES = ['bandit', 'crossbowman', 'guard', 'soldier', 'halberdier', 'captain', 'blackknight'];
-const DUNGEON_FOES = BESTIARY.map((e) => e.id).filter((id) => !WILDS_FOES.includes(id) && !STORY_FOES.includes(id));
+const DUNGEON_FOES = BESTIARY.map((e) => e.id);
 const ELITES = () => entry('Elites', `<p>Bigger, armoured and tinted crimson, more common the deeper you go. Each carries one affix, named over its head as it rises:</p><ul>${Object.values(AFFIXES).map((a) => `<li><b>${a.name}</b>: ${a.about}.</li>`).join('')}</ul>`, 'var(--crimson)');
 
 const DEPTHS = [
@@ -50,11 +46,7 @@ const DEPTHS = [
   ['The Ember Forges', 'Below the second Lock the dungeon runs hot: depths 21 to 28. Molten light and slag pools, worked by cinderlings that burst when they die, smelters that throw molten iron, and armoured anvilbacks.', 'forge'],
   ['The Crucible', 'Depth 29, where the Forgemaster waits. Past him, the Lock again, and the three regions start over: each ten depths harder than the last.', 'crucible'],
 ];
-const BIOMES = [
-  ...DEPTHS,
-  ['The Swordsmith', "Adventure mode: a story in eight chapters, from your village down the King's Road, through the castle wall, courtyard and great hall, to the Black Knight at the top of the tower. No magic: Attack is one swing that lands a moment after you start it, and Dash is one quick step the way you move. Coin and iron from the men you beat buy a better blade and mail at your forge between chapters. Every chapter start is saved; falling sends you back to it.", 'adventure'],
-  ['The Wilds', 'The Open World mode: a huge island of meadow, forest, rock and lakes. Press Use by trees, rocks and bushes for wood, stone and fiber, and Tab, C or the View button to craft campfires, barricades, bandages and whetstones. Zombies rise every night and burn at dawn, and each dawn brings a boon. Every third night is a Blood Moon: a red sky, more dead and more elites, and every kill pays double ash.', 'wilds'],
-];
+const BIOMES = DEPTHS;
 const biome = ([n, t, id]) => entry(n, `<p>${t}</p>`, null, 'biome-' + id, true);
 // what can wait behind a door
 const ROOMS = () => entry('Rooms', `<p>Each door shows what waits behind it.</p><dl>
@@ -108,7 +100,7 @@ const SECTIONS = [
 
 export const codexBody = (i, imgBase = 'assets/shots/') => { base = imgBase; return SECTIONS[i](); };
 
-// The wiki is laid out by the three ways to play; each part is [title, () => entries]
+// The wiki's main section; each part is [title, () => entries]
 export const MODES = [
   {
     id: 'dungeon', name: 'The Dungeon', art: 'card-dungeon',
@@ -121,25 +113,6 @@ export const MODES = [
       ['Enemies and bosses', () => ELITES() + foes(DUNGEON_FOES, dungeonGrowth)],
       ['Patrons and boons', SECTIONS[2]],
       ['Upgrades', SECTIONS[4]],
-    ],
-  },
-  {
-    id: 'wilds', name: 'The Wilds', art: 'card-open',
-    intro: 'The Open World card, in beta. A huge wild island with no dungeon in sight: gather and build by day, and keep a fire lit when the dead rise at night. How many nights can you last?',
-    parts: [
-      ['The island', () => entry('The Wilds', "<p>Meadow, forest, rock and lakes, far bigger than any room. You play any of the Dungeon's classes, with the weapon you carry. Zombies rise every night and burn at dawn, and each dawn brings a boon. Crawlers join from the second night, bloaters from the third.</p>", null, 'biome-wilds', true)],
-      ['Gathering and crafting', () => entry('Crafting', `<p>Press Use by trees, rocks and bushes for wood, stone and fiber. Craft with Tab, C, the View button, or the CRAFT button on a phone.</p><ul>${RECIPES.map((r) => `<li><b>${r.name}</b> (${costText(r)}): ${r.desc}</li>`).join('')}</ul>`)],
-      ['The dead', () => foes(WILDS_FOES, 'more each night. From the third night some are elites: bigger, armored and tinted crimson.')],
-    ],
-  },
-  {
-    id: 'adventure', name: 'Adventure', art: 'card-adventure',
-    intro: 'A story in eight chapters. You are a village swordsmith, the castle has fallen to a black knight, and the princess is locked in the tower. No magic: one sword, and the mail you forge yourself.',
-    parts: [
-      ['The swordsmith', () => classEntry(SMITH, null) + biome(BIOMES[DEPTHS.length])],
-      ['Chapters', () => entry('The road to the tower', `<p>Every chapter start is saved. Fall, and you go back to the start of that chapter with your forge work kept.</p><ol>${CHAPTERS.map((c) => `<li><b>${c.title}</b>: ${c.sub}</li>`).join('')}</ol>`)],
-      ['The forge', () => entry('Your forge', `<p>Coin and iron come from the men you beat. Spend them between chapters.</p><ul>${FORGE.map((f) => `<li><b>${f.name}</b>: ${f.desc} Up to ${FORGE_MAX} times.</li>`).join('')}</ul>`)],
-      ['Enemies', () => foes(STORY_FOES, 'a little more each chapter.')],
     ],
   },
 ];

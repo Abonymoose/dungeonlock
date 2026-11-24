@@ -6,6 +6,12 @@ import { input } from './input.js';
 // Phones get a chat button with all twenty. On a controller the d-pad sends four, and holding LT (or pressing in the
 // right stick) opens a wheel of all twenty: point the right stick at one and let go. Names and health bars ride here too.
 export const EMOTES = ['👍', '👎', '💩', '😂', '🔥', '💀', '❤️', '😭', '😎', '👋', '🤡', '🎉', '😡', '🙏', '🤝', '👀', '💯', '🗿', '🐐', '🤯'];
+// a co-op profile's color: on your name tag, and as a ring at your hero's feet
+export const COLORS = [
+  { name: 'Gold', css: '#E8D25A', hex: 0xe8d25a }, { name: 'Teal', css: '#46C2A8', hex: 0x46c2a8 }, { name: 'Crimson', css: '#E0504A', hex: 0xe0504a },
+  { name: 'Sky', css: '#7FB2D9', hex: 0x7fb2d9 }, { name: 'Violet', css: '#B57BD6', hex: 0xb57bd6 }, { name: 'Moss', css: '#8FC46A', hex: 0x8fc46a },
+  { name: 'Ember', css: '#E8893A', hex: 0xe8893a }, { name: 'Bone', css: '#EFE3CC', hex: 0xefe3cc },
+];
 export const emoteHooks = { send: null }; // the co-op layer sets this to pass emotes on
 const BUBBLE = 2.6, FEED = 5;
 
@@ -103,8 +109,9 @@ export function updateTags(remotes = []) {
   if (!touchPlay) panel.classList.add('hidden');
   for (const r of remotes) {
     const t = tagFor(r);
-    const name = esc(r.netName ?? 'Player');
+    const name = `<span class="ticon">${EMOTES[r.netIcon] ?? ''}</span>${esc(r.netName ?? 'Player')}`;
     if (t.name.innerHTML !== name) t.name.innerHTML = name;
+    t.name.style.color = COLORS[r.netColor]?.css ?? '';
     t.hp.firstChild.style.width = Math.max(0, Math.min(100, 100 * r.hp / (r.maxHp || 1))) + '%';
     t.el.classList.toggle('remote', true);
     t.el.classList.toggle('down', !!r.dead);

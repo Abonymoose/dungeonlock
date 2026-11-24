@@ -1,34 +1,22 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ramp } from './render.js';
 
-// KayKit packs by Kay Lousberg (CC0): www.kaylousberg.com. Zombies from Quaternius' Zombie Apocalypse Kit (CC0): quaternius.com
+// KayKit packs by Kay Lousberg (CC0): www.kaylousberg.com
 const CHARACTERS = {
   Knight: 'adventurers/Knight', Mage: 'adventurers/Mage', Rogue_Hooded: 'adventurers/Rogue_Hooded', Barbarian: 'adventurers/Barbarian',
   Skeleton_Minion: 'skeletons/Skeleton_Minion', Skeleton_Warrior: 'skeletons/Skeleton_Warrior',
   Skeleton_Mage: 'skeletons/Skeleton_Mage', Skeleton_Rogue: 'skeletons/Skeleton_Rogue',
-  Zombie_Basic: '../quaternius/zombies/Zombie_Basic.gltf', Zombie_Arm: '../quaternius/zombies/Zombie_Arm.gltf',
-  Zombie_Chubby: '../quaternius/zombies/Zombie_Chubby.gltf', Zombie_Ribcage: '../quaternius/zombies/Zombie_Ribcage.gltf',
 };
-// the Wilds: trees, rocks, bushes and grass from the KayKit Forest Nature Pack
-export const FOREST = [
-  'Tree_1_A', 'Tree_1_B', 'Tree_2_A', 'Tree_2_C', 'Tree_3_A', 'Tree_4_A', 'Tree_Bare_1_A',
-  'Rock_1_A', 'Rock_1_E', 'Rock_2_A', 'Rock_3_A', 'Rock_3_E', 'Bush_1_A', 'Bush_2_B', 'Bush_3_A', 'Bush_4_A', 'Grass_1_B', 'Grass_2_B',
-];
 const PROPS = [
   'floor_tile_small', 'floor_tile_large', 'floor_tile_small_broken_A', 'floor_tile_small_broken_B', 'floor_tile_small_decorated',
   'floor_tile_big_spikes', 'floor_foundation_front', 'floor_foundation_corner', 'wall', 'wall_doorway', 'wall_gated', 'wall_cracked',
   'pillar', 'pillar_decorated', 'torch_mounted', 'barrel_large', 'barrel_small', 'crates_stacked', 'rubble_half',
   'banner_patternA_red', 'banner_red', 'sword_shield_broken', 'candle_triple', 'box_large', 'chest',
 ];
-// Adventure mode's village and castle, from the KayKit Medieval Hexagon Pack (made small for a hex board; scaled up to walk among)
-export const MEDIEVAL = [
-  'building_blacksmith_red', 'building_castle_red', 'building_tower_A_red', 'building_tower_B_red', 'building_home_A_red', 'building_home_B_red',
-  'building_tavern_red', 'building_well_red', 'building_church_red', 'building_market_red', 'wall_straight', 'wall_straight_gate', 'wall_corner_A_outside',
-  'fence_wood_straight', 'weaponrack', 'barrel', 'crate_A_big', 'tent', 'target', 'flag_red', 'resource_lumber', 'resource_stone', 'wheelbarrow', 'sack', 'bucket_water',
-];
+// the Keep's weapon rack, from the KayKit Medieval Hexagon Pack
+export const MEDIEVAL = ['weaponrack'];
 
 const gltfs = {};
 const toonCache = new Map();
@@ -49,22 +37,7 @@ function toonify(root) {
   });
 }
 
-// One forest model as a single geometry (in our scale: KayKit's 2-unit tile is our 1) plus its shared material, for instancing
-const natureCache = new Map();
-export function natureMesh(name) {
-  if (natureCache.has(name)) return natureCache.get(name);
-  let mesh = null;
-  gltfs[name].scene.updateMatrixWorld(true);
-  gltfs[name].scene.traverse((o) => { if (o.isMesh && !mesh) mesh = o; });
-  const geometry = mergeVertices(mesh.geometry.clone().applyMatrix4(mesh.matrixWorld).scale(0.5, 0.5, 0.5));
-  geometry.computeBoundingBox();
-  const size = geometry.boundingBox.getSize(new THREE.Vector3());
-  const out = { geometry, material: mesh.material, size };
-  natureCache.set(name, out);
-  return out;
-}
-
-// A placed copy of a Medieval piece (shared geometry and materials), at Adventure scale
+// A placed copy of a Medieval piece (shared geometry and materials), scaled up from its hex-board size
 export const MEDIEVAL_SCALE = 3.5;
 export function medieval(name, s = MEDIEVAL_SCALE) {
   const o = gltfs[name].scene.clone();
@@ -75,8 +48,7 @@ export function medieval(name, s = MEDIEVAL_SCALE) {
 export async function loadAssets(onProgress) {
   const loader = new GLTFLoader();
   const jobs = [
-    ...Object.entries(CHARACTERS).map(([k, p]) => [k, p.endsWith('.gltf') ? `assets/kaykit/${p}` : `assets/kaykit/${p}.glb`]),
-    ...FOREST.map((n) => [n, `assets/kaykit/forest/${n}_Color1.gltf`]),
+    ...Object.entries(CHARACTERS).map(([k, p]) => [k, `assets/kaykit/${p}.glb`]),
     ...MEDIEVAL.map((n) => [n, `assets/kaykit/medieval/${n}.gltf`]),
     ...PROPS.map((n) => [n, `assets/kaykit/dungeon/${n}.glb`]),
   ];

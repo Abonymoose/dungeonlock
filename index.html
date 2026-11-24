@@ -217,7 +217,18 @@
   /* co-op: the room code, and the players in the room */
   .roomcode { font-size: 1.1em; letter-spacing: 0.2em; color: var(--oak); }
   .roomcode b { font-size: 1.8em; color: var(--sand); font-weight: normal; margin-left: 0.4em; }
-  .list.lobby { min-width: calc(var(--u) * 120); }
+  .lobbywrap { display: flex; gap: calc(var(--u) * 8); align-items: flex-start; justify-content: center; max-width: 100%; }
+  .list.profile { min-width: calc(var(--u) * 110); }
+  .list.profile .emo, .lp .emo, .ptag .ticon { font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; }
+  .list.profile b { font-weight: normal; color: var(--sand); margin-left: 0.4em; }
+  .panel.lobby { display: flex; flex-direction: column; gap: calc(var(--u) * 3); min-width: calc(var(--u) * 120); text-align: left; }
+  .lp { display: flex; gap: calc(var(--u) * 4); align-items: center; padding-left: calc(var(--u) * 3); box-shadow: inset var(--u) 0 0 var(--c); }
+  .lp img { width: calc(var(--u) * 20); height: calc(var(--u) * 22); object-fit: cover; image-rendering: pixelated; background: var(--onyx); }
+  .lp b { font-weight: normal; color: var(--c); font-size: 0.85em; }
+  .lp .emo { margin-right: 0.4em; font-size: 1.5em; vertical-align: middle; }
+  .list.profile .emo { font-size: 1.6em; vertical-align: middle; line-height: 0.8; }
+  .lp small { display: block; color: var(--oak); font-size: 0.65em; margin-top: 0.3em; }
+  .ptag .ticon { margin-right: 0.3em; }
   /* names, health and emojis over heroes; the chat feed; the phone chat button */
   #tags { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
   .ptag { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 1); }
@@ -296,14 +307,6 @@
     background: rgba(19, 21, 21, 0.9); border: var(--u) solid var(--choc);
   }
   #tutorial .step { font-size: 0.7em; color: var(--oak); }
-  /* Adventure's story lines */
-  #talk {
-    position: fixed; left: 50%; bottom: calc(var(--u) * 14); transform: translateX(-50%); z-index: 4; pointer-events: none;
-    width: min(92vw, calc(var(--u) * 240)); padding: calc(var(--u) * 5) calc(var(--u) * 7); background: rgba(19, 21, 21, 0.92); border: var(--u) solid var(--choc);
-  }
-  #talk .who { color: var(--sand); font-size: 0.75em; margin-bottom: 0.6em; }
-  #talk p { margin: 0; font-size: 0.8em; line-height: 1.8; color: var(--oak); }
-  #talk .next { position: absolute; right: calc(var(--u) * 5); bottom: calc(var(--u) * 4); }
   #hud.noxp .xpwrap, #hud.noxp .lives { display: none; }
   /* in the tutorial: no lives (it gives 99), Ash, level or XP; health only in the fight step */
   #hud.tut .lives, #hud.tut .res, #hud.tut .xpwrap, #hud.tut:not(.tut-fight) .hpwrap { display: none; }
@@ -345,16 +348,12 @@
   #touch .cast { --s: 50px; --x: 172px; --y: 172px; }
   #touch .interact { --x: 300px; --y: 66px; display: none; }
   #touch.use .interact { display: flex; }
-  #touch .pause, #touch .craft { right: auto; bottom: auto; left: calc(var(--x) - var(--s) / 2); top: calc(var(--y) - var(--s) / 2); }
+  #touch .pause { right: auto; bottom: auto; left: calc(var(--x) - var(--s) / 2); top: calc(var(--y) - var(--s) / 2); }
   #touch .pause { --s: 36px; --x: 30px; --y: 30px; }
-  #touch .craft { --s: 46px; --x: 96px; --y: 34px; display: none; }
-  #touch.wild .craft { display: flex; }
-  #touch.grounded .special, #touch.grounded .cast { display: none; }
   /* the use prompt sits above the thumbs; hints with one button become tappable chips */
   .touch-on #prompt { bottom: 34%; }
   .touch-on .hints > span { padding: 0.5em 0.9em; border: var(--u) solid var(--choc); background: var(--onyx); }
   .touch-on .hints .btn:only-of-type { display: none; }
-  .touch-on #talk { pointer-events: auto; }
   /* held upright: ask for sideways */
   #rotate { display: none; }
   @media (orientation: portrait) and (pointer: coarse) {
@@ -407,7 +406,6 @@
 <div id="prompt" class="panel hidden"></div>
 <div id="banner"><h1></h1><p></p></div>
 <div id="tutorial" class="hidden"></div>
-<div id="talk" class="hidden" data-act="confirm"></div>
 <div id="toast" class="panel"></div>
 <div id="screen" class="hidden"></div>
 <div id="fade"></div>

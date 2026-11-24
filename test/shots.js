@@ -133,7 +133,7 @@ export async function all() {
   W.player.hp = 0; W.player.dead = true;
   T.step(2);
   await T.toPlayMenu();
-  T.clickSel(5); // Tutorial
+  T.clickSel(3); // Tutorial
   await T.waitFor('play');
   for (let i = 0; i < 50 && !W.tutorial; i++) await T.sleep(100);
   T.step(1.2);
@@ -172,81 +172,6 @@ export async function buildWiki() {
   splice('<main>', '</main>', main);
   const res = await fetch('/__wiki', { method: 'POST', body: page });
   return res.ok ? 'wiki rebuilt' : 'FAILED';
-}
-
-// The Wilds: a daytime wide shot for the codex and a night by the campfire for the Open World card.
-// Run after all():  await S.wildShots();
-export async function wildShots() {
-  const out = [];
-  await T.toPlayMenu();
-  T.clickSel(1); // Open World
-  T.press(0);
-  await T.waitFor('play');
-  W.player.maxHp = W.player.hp = 9999;
-  W.run.xp = -1e9;
-  const room = W.room, w = W.run.wild;
-  // a forest edge by day
-  const tree = room.nodes.find((n) => n.kind === 'tree' && Math.hypot(n.x - 80, n.z - 80) > 9 && Math.hypot(n.x - 80, n.z - 80) < 22);
-  W.player.pos.copy(room.freeSpot(W.player.pos.clone().set(tree.x, 0, tree.z), 1.5, 3));
-  w.clock = 0.25;
-  T.step(0.2);
-  out.push(await shot('biome-wilds', W.player.pos, { zoom: 1 }));
-  // night by the fire, the dead closing in
-  const spot = room.freeSpot(room.entry.clone().add({ x: 3, y: 0, z: 0 }), 0, 3);
-  W.player.pos.copy(spot);
-  W.player.facing.set(1, 0, 0.3).normalize();
-  room.build('fire', spot.x + 1.3, spot.z + 0.4);
-  w.clock = 0.6195;
-  T.step(0.3);
-  for (const e of W.enemies) { e.hp = 0; e.dead = true; }
-  T.step(2);
-  for (const [dx, dz] of [[-3.2, -1.4], [-1.8, 2.6], [3.4, -2.6]]) spawnEnemy('zombie', spot.x + dx, spot.z + dz, 2);
-  T.step(1.4);
-  for (const e of W.enemies) { e.timer = 99; e.state = 'recover'; e.facing.subVectors(W.player.pos, e.pos).setY(0).normalize(); e.model.root.rotation.y = Math.atan2(e.facing.x, e.facing.z); }
-  T.step(0.3);
-  out.push(await shot('card-open', spot.clone().add({ x: 0.5, y: 0, z: 0.3 }), { zoom: 1.5, w: 300, h: 220, lift: 0.2 }));
-  W.player.hp = 0; W.player.dead = true;
-  T.step(3);
-  T.press(0); // over -> title, then back to the Dungeon card so later runs are dungeon runs
-  await T.waitFor('title');
-  T.press(1);
-  T.step(0.1);
-  T.clickSel(0);
-  return out;
-}
-
-// Adventure: the village by morning for the codex, and the fight at the castle gate at dusk for the Play card.
-// Run after all():  await S.adventureShots();
-export async function adventureShots() {
-  const { meta } = await import('../src/run.js');
-  const out = [];
-  const open = async (i) => {
-    meta.adventure = { chapter: i, coin: 0, iron: 0, edge: 0, reach: 0, mail: 0 };
-    if (W.adventure && W.state === 'play') { W.player.hp = 0; W.player.dead = true; T.step(2); W.adventure.chapter = i; T.press(0); }
-    else { await T.toPlayMenu(); T.clickSel(2); }
-    for (let t = 0; t < 80 && W.state !== 'talk'; t++) { await T.sleep(100); T.step(0.02); }
-    for (let k = 0; k < 20 && W.state === 'talk'; k++) { T.step(0.35); T.press(0); }
-    W.player.maxHp = W.player.hp = 9999;
-  };
-  await open(0);
-  const v = W.room.plan, [fx, fz] = [v.buildings[0].x, v.buildings[0].z];
-  W.player.pos.set((fx + v.entry[0]) / 2, 0, (fz + v.entry[1]) / 2);
-  T.step(0.2);
-  out.push(await shot('biome-adventure', W.player.pos.clone().add({ x: -1.5, y: 0, z: -1.5 }), { zoom: 0.9 }));
-  await open(2);
-  const plan = W.room.plan, gate = plan.triggers[1];
-  W.player.pos.set(gate.at[0] + 1.2, 0, gate.at[1] + 1.2);
-  T.step(2.4);
-  for (const e of W.enemies) { e.timer = 99; e.state = 'recover'; e.facing.subVectors(W.player.pos, e.pos).setY(0).normalize(); e.model.root.rotation.y = Math.atan2(e.facing.x, e.facing.z); }
-  W.player.facing.set(-1, 0, -1).normalize();
-  W.player.model.root.rotation.y = Math.atan2(-1, -1);
-  T.step(0.3);
-  out.push(await shot('card-adventure', W.player.pos.clone().add({ x: -1.6, y: 0, z: -1.6 }), { zoom: 1.05, w: 300, h: 220, lift: 0.4 }));
-  // forget the chapters these shots visited, so the real save isn't left at chapter 3 (reload the page after this)
-  const { saveMeta } = await import('../src/run.js');
-  meta.adventure = null;
-  saveMeta();
-  return out;
 }
 
 // The Sunken Vaults' foes and rooms, and the Keep, for the codex and wiki.  Run:  await S.newShots();

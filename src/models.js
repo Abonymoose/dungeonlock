@@ -25,7 +25,7 @@ export const makeRogue = (w = {}) => character('Rogue_Hooded', {
   anims: { ...HERO, attack: 'Dualwield_Melee_Attack_Stab', attack2: 'Dualwield_Melee_Attack_Slice', special: 'Throw', ...w.anims },
 });
 
-// the Barbarian keeps his bear hat and cape (the Adventure smith is the same model without them)
+// the Barbarian keeps his bear hat and cape
 export const makeBarbarian = (w = {}) => character('Barbarian', {
   tint: [C.ONYX, 0x6a3a2a, C.OAK, 0.55],
   hide: w.hide ?? ['1H_Axe', '1H_Axe_Offhand', 'Barbarian_Round_Shield', 'Mug'],
@@ -70,17 +70,6 @@ export const makeStalker = () => skeleton('Skeleton_Rogue', {
   lend: [['Rogue_Hooded', 'Knife', 'handslotr'], ['Rogue_Hooded', 'Knife_Offhand', 'handslotl']],
   anims: { ...SKEL, run: 'Running_A', attack: 'Dualwield_Melee_Attack_Stab' },
 });
-// ---- the dead of the Wilds: Quaternius zombies, about grunt height ----
-const ZOMBIE = { idle: 'Idle', run: 'Walk', hit: 'HitReact', death: 'Death', attack: 'Punch' };
-export const makeZombie = () => character(Math.random() < 0.5 ? 'Zombie_Basic' : 'Zombie_Arm', { scale: 0.9, anims: ZOMBIE });
-export const makeCrawler = () => character('Zombie_Ribcage', { scale: 0.9, anims: { ...ZOMBIE, run: 'Crawl', attack: 'Jump' } });
-export const makeBloater = () => character('Zombie_Chubby', { scale: 0.85, anims: ZOMBIE });
-// the Wilds' boss: a bloater grown huge and grave-dark
-export const makeGraveLord = () => {
-  const m = character('Zombie_Chubby', { scale: 1.6, anims: ZOMBIE });
-  for (const mat of m.mats) mat.color.multiply(new THREE.Color(0x9a8ab0));
-  return m;
-};
 export const makeSapper = () => {
   const m = skeleton('Skeleton_Minion', {
     scale: 0.44, lend: [['Rogue_Hooded', 'Throwable', 'handslotr']], anims: { ...SKEL, run: 'Running_B', attack: 'Spellcast_Raise' },
@@ -132,19 +121,6 @@ export const makeWarden = () => {
   return m;
 };
 
-// ---- Adventure mode: a village swordsmith, the princess, and the usurper's men. All KayKit, recoloured with the same ramp ----
-
-const HUMAN = { idle: 'Idle', run: 'Running_A', hit: 'Hit_A', death: 'Death_A', attack: '1H_Melee_Attack_Chop' };
-const KNIGHT_PARTS = ['1H_Sword_Offhand', 'Badge_Shield', 'Rectangle_Shield', 'Round_Shield', 'Spike_Shield', '1H_Sword', '2H_Sword'];
-const knightWith = (keep) => KNIGHT_PARTS.filter((n) => !keep.includes(n));
-// the Barbarian without his bear hat, cape, axes and mug: a working smith with a plain sword
-export const makeSmith = () => character('Barbarian', {
-  tint: [C.ONYX, 0x5a3a2a, C.OAK, 0.5],
-  hide: ['1H_Axe_Offhand', 'Barbarian_Round_Shield', '1H_Axe', '2H_Axe', 'Mug', 'Barbarian_Hat', 'Barbarian_Cape'],
-  lend: [['Knight', '1H_Sword', 'handslotr']],
-  anims: { ...HERO, attack: '1H_Melee_Attack_Slice_Diagonal', dash: 'Dodge_Backward', dashF: 'Dodge_Forward', dashL: 'Dodge_Left', dashR: 'Dodge_Right', cheer: 'Cheer' },
-});
-// the Mage without hat, staff or books, in rose and gold, with a little crown
 // a simple crown, unlit so it reads at a glance even in a dim room; y is its height in the head bone's space
 function crown(m, color, y) {
   const c = new THREE.Group(), mat = basic(color);
@@ -160,8 +136,6 @@ function crown(m, color, y) {
   (head ?? m.body).add(c);
   return m;
 }
-export const makePrincess = () => crown(character('Mage', { tint: [0x3a1428, 0xc85a8a, 0xFFE6C8, 0.6], hide: ['Spellbook', 'Spellbook_open', '1H_Wand', '2H_Staff', 'Mage_Hat'], anims: { idle: 'Idle', cheer: 'Cheer', run: 'Walking_A' } }), 0xF0C040, 1.05);
-
 // ---- the Sunken Vaults: the drowned dead, sea-green and waterlogged ----
 const soak = (m, color) => { for (const mat of m.mats) mat.color.multiply(new THREE.Color(color)); return m; };
 export const makeDrowned = () => soak(skeleton('Skeleton_Warrior', {
@@ -191,23 +165,6 @@ export const makeForgemaster = () => crown(soak(skeleton('Skeleton_Warrior', {
   scale: 1.25, lend: [['Knight', '2H_Sword', 'handslotr']],
   anims: { ...SKEL, run: 'Walking_D_Skeletons', attack: '2H_Melee_Attack_Chop', cast: 'Spellcast_Summon' },
 }), 0xffb080), 0xff6a20, 1.0);
-export const makeBandit = () => character('Rogue_Hooded', {
-  tint: [C.ONYX, 0x8a5a3a, 0xE0C8A0, 0.95], hide: ['1H_Crossbow', '2H_Crossbow', 'Throwable', 'Knife_Offhand'],
-  anims: { ...HUMAN, attack: 'Dualwield_Melee_Attack_Stab' },
-});
-export const makeCrossbowman = () => character('Rogue_Hooded', {
-  tint: [C.ONYX, 0x4a5a80, 0xC8D0E0, 0.95], hide: ['1H_Crossbow', 'Throwable', 'Knife', 'Knife_Offhand'],
-  anims: { ...HUMAN, attack: '2H_Ranged_Shoot' },
-});
-export const makeHalberdier = () => character('Knight', { tint: [C.ONYX, 0x4a5a6e, C.OAK, 0.5], hide: [...knightWith(['2H_Sword']), 'Knight_Cape'], anims: { ...HUMAN, attack: '1H_Melee_Attack_Stab' } });
-export const makeGuard = () => character('Knight', { tint: [C.ONYX, C.CRIMSON, C.OAK, 0.5], hide: knightWith(['1H_Sword', 'Rectangle_Shield']), anims: { ...HUMAN, attack: 'Block_Attack' } });
-export const makeSoldier = () => character('Knight', { tint: [C.ONYX, 0x6E5050, C.OAK, 0.5], hide: [...knightWith(['1H_Sword']), 'Knight_Cape'], anims: HUMAN });
-export const makeCaptain = () => character('Knight', { scale: 0.58, tint: [C.ONYX, 0x8a6a2a, 0xF0D898, 0.55], hide: knightWith(['1H_Sword', 'Badge_Shield']), anims: { ...HUMAN, attack: '1H_Melee_Attack_Slice_Horizontal' } });
-export const makeBlackKnight = () => character('Knight', {
-  scale: 0.68, tint: [0x08080c, 0x24242c, 0x5a5a66, 0.8], hide: knightWith(['2H_Sword']),
-  anims: { ...HUMAN, attack: '2H_Melee_Attack_Slice', spin: '2H_Melee_Attack_Spin' },
-});
-
 // ---- pickups and door icons (code-made: they need to glow and read at a glance) ----
 
 function part(group, geo, color, x, y, z, glow = false) {

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { C } from './config.js';
 import { world } from './world.js';
-import { makeGrunt, makeZombie, makeCrawler, makeBloater, makeBandit, makeCrossbowman, makeGuard, makeSoldier, makeCaptain, makeBlackKnight, makeHexer, makeBrute, makeStalker, makeSapper, makeWhirler, makeSlinger, makeShieldbearer, makeBonecaller, makeWarden, makePrior, makeReaver, makeDrowned, makeTidecaller, makeLurker, makeDrownedKing, makeGraveLord, makeCinderling, makeSmelter, makeAnvilback, makeForgemaster, makeHalberdier, disposeObject } from './models.js';
+import { makeGrunt, makeHexer, makeBrute, makeStalker, makeSapper, makeWhirler, makeSlinger, makeShieldbearer, makeBonecaller, makeWarden, makePrior, makeReaver, makeDrowned, makeTidecaller, makeLurker, makeDrownedKing, makeCinderling, makeSmelter, makeAnvilback, makeForgemaster, disposeObject } from './models.js';
 import { earn } from './feats.js';
 import { XP_FOR, xpToNext } from './run.js';
 import { updateStatus } from './boons.js';
@@ -12,18 +12,6 @@ import { settings } from './settings.js';
 const Y = new THREE.Vector3(0, 1, 0), tmp = new THREE.Vector3(), dir = new THREE.Vector3();
 
 export const TYPES = {
-  zombie: { name: 'Zombie', about: 'Claws its way out of the earth at night in the Wilds and shambles toward you. The sun burns it at dawn.', model: makeZombie, hp: 40, speed: 1.9, radius: 0.33, ash: 1, rise: true, think: gruntAI },
-  crawler: { name: 'Crawler', about: 'Half a body dragging itself fast through the grass. Shows a short red line, then leaps along it.', model: makeCrawler, hp: 22, speed: 3.8, radius: 0.3, ash: 1, rise: true, think: stalkerAI },
-  gravelord: { name: 'The Grave Lord', title: 'King of the Buried', boss: true, about: 'Digs his way up on every fifth night in the Wilds. Slams the ground, charges, and calls the dead up around him. He burns at dawn like the rest, if you can last that long.', model: makeGraveLord, hp: 520, speed: 2.0, radius: 0.85, armor: 0.1, ash: 40, knockResist: 0.1, stunResist: 0.25, rise: true, think: graveLordAI },
-  bloater: { name: 'Bloater', about: 'Fat, slow and tough. Slams the ground around itself after a long windup, so hit it from range.', model: makeBloater, hp: 90, speed: 1.5, radius: 0.5, armor: 0.1, ash: 3, knockResist: 0.3, stunResist: 0.5, rise: true, think: bruteAI },
-  // Adventure mode's people. ash is the coin they carry; iron is what an armoured man leaves for your forge.
-  bandit: { name: 'Bandit', about: 'A road thief with a knife. Quick, but goes down in two or three cuts.', model: makeBandit, hp: 34, speed: 3.2, radius: 0.32, ash: 3, think: gruntAI },
-  crossbowman: { name: 'Crossbowman', about: 'Keeps back and shoots down a red line. Close the distance or step out of the line.', model: makeCrossbowman, hp: 26, speed: 2.6, radius: 0.3, ash: 3, think: hexerAI },
-  guard: { name: 'Castle Guard', about: 'Holds a tall shield to the front and turns slowly. Step round it and strike its back.', model: makeGuard, hp: 46, speed: 2.3, radius: 0.36, armor: 0.1, ash: 4, iron: 1, knockResist: 0.5, guard: true, think: shieldAI },
-  soldier: { name: 'Soldier', about: "The usurper's man-at-arms. Wide, heavy chops; wait for the swing, then answer it.", model: makeSoldier, hp: 44, speed: 2.8, radius: 0.34, armor: 0.1, ash: 4, iron: 1, think: gruntAI },
-  halberdier: { name: 'Halberdier', about: 'A long blade on a long reach. Thrusts straight ahead from well outside your sword, so come at it from the side.', model: makeHalberdier, hp: 50, speed: 2.4, radius: 0.36, armor: 0.1, ash: 5, iron: 2, think: halberdAI },
-  captain: { name: 'Captain', about: 'Leads the guard. A long windup, then a cut all the way round him. Step back and come in after.', model: makeCaptain, hp: 110, speed: 2.4, radius: 0.45, armor: 0.15, ash: 10, iron: 3, knockResist: 0.3, stunResist: 0.5, think: bruteAI },
-  blackknight: { name: 'The Black Knight', title: "Champion of the Usurper", boss: true, about: 'Waits at the top of the tower. Wide sweeps, an overhead smash, and a running thrust.', model: makeBlackKnight, hp: 300, speed: 2.6, radius: 0.6, armor: 0.15, ash: 30, iron: 5, knockResist: 0.15, stunResist: 0.3, think: knightBossAI },
   grunt: { name: 'Grunt', about: 'Walks up and swings its sword in a wide arc. Slow to recover.', model: makeGrunt, hp: 34, speed: 3.0, radius: 0.33, ash: 2, think: gruntAI },
   hexer: { name: 'Hexer', about: 'Keeps its distance and fires aimed bolts down a red line. Close in fast.', model: makeHexer, hp: 24, speed: 2.6, radius: 0.3, ash: 3, think: hexerAI },
   stalker: { name: 'Stalker', about: 'Fast. Shows a short red line, then lunges along it. Step aside.', model: makeStalker, hp: 28, speed: 4.2, radius: 0.3, ash: 3, think: stalkerAI },
@@ -104,15 +92,13 @@ function create(type, x, z, depth, elite = false, affix = null) {
 
 function onDeath(e) {
   const run = world.run, p = world.player;
-  if (e.type === 'gravelord' && !e.burned) earn('gravelord');
   // a volatile elite goes off a moment after it falls
   if ((e.affix === 'volatile' || e.T.burst) && !e.puppet) {
     const at = e.pos.clone();
     telegraph({ shape: 'circle', pos: at, radius: 2.0, duration: 0.6, onDone: () => { aoe(e, { pos: at, radius: 2.0, damage: 14 + e.depth, knockback: 8 }); sfx('slam'); } });
   }
   run.kills++;
-  run.ash += e.T.ash * (run.wild?.blood ? 2 : 1); // a Blood Moon pays double
-  if (world.adventure && e.T.iron) world.adventure.iron += e.T.iron;
+  run.ash += e.T.ash;
   // XP: level-ups wait until the room is clear, so a menu never pops up mid-fight
   run.xp += XP_FOR[e.type] ?? 0;
   while (run.xp >= xpToNext(run.level)) {
@@ -411,30 +397,6 @@ function whirlerAI(e, p, dt) {
   windup(e, { shape: 'circle', radius: 1.5, duration: 0.7 }, () => Object.assign(e, { state: 'spinning', spinT: 1.8, cutT: 0 }), 0);
 }
 
-// The Black Knight: nothing magic, just a big man with a big sword. A wide sweep, an overhead smash, and a running thrust.
-function knightBossAI(e, p, dt) {
-  if (e.state === 'charging') return chargeStep(e, p, dt);
-  if (e.state === 'windup') return;
-  const enraged = e.hp < e.maxHp / 2, k = enraged ? 0.75 : 1;
-  e.timer -= dt;
-  const d = face(e, p);
-  if (e.timer > 0) return walk(e, d > 2.2 ? 0.8 : 0);
-  const move = d > 4.5 ? 2 : e.phase++ % 2;
-  if (move === 0) {
-    windup(e, { shape: 'arc', radius: 2.5, arc: 2.6, duration: 0.65 * k }, () => meleeArc(e, { range: 2.5, arc: 2.6, damage: 18 + e.depth, knockback: 9 }), 0.9 * k);
-  } else if (move === 1) {
-    windup(e, { shape: 'circle', radius: 1.9, duration: 0.95 * k }, () => {
-      aoe(e, { pos: e.pos, radius: 1.9, damage: 24 + e.depth, knockback: 10 });
-      world.shake = 0.3;
-      sfx('slam');
-    }, 1.1 * k);
-  } else {
-    const line = e.facing.clone();
-    windup(e, { shape: 'line', length: 6, width: 1.1, duration: 0.7 * k }, () => {
-      Object.assign(e, { state: 'charging', chargeT: 6 / 14, chargeHit: false, chargeDir: line, chargeSpeed: 14, chargeDmg: 20 + e.depth });
-    }, 0.8 * k);
-  }
-}
 
 // Throws at where you are now; the bomb lands when the circle fills. Stun the thrower and the throw is lost.
 function slingerAI(e, p, dt) {
@@ -543,29 +505,6 @@ function lunge(e, k) {
   }, e.chain > 0 ? 0 : 1.3 * k);
 }
 
-// Boss of the Wilds: slams, a lumbering charge, and more of the dead around him
-function graveLordAI(e, p, dt) {
-  if (e.state === 'charging') return chargeStep(e, p, dt);
-  if (e.state === 'windup') return;
-  const enraged = e.hp < e.maxHp / 2, k = enraged ? 0.75 : 1;
-  e.timer -= dt;
-  const d = face(e, p);
-  if (e.timer > 0) return walk(e, d > 2.5 ? 0.8 : 0);
-  const move = d < 3 ? 0 : e.phase++ % 3;
-  if (move === 0) {
-    windup(e, { shape: 'circle', radius: 3.2, duration: 1.0 * k }, () => { aoe(e, { pos: e.pos, radius: 3.2, damage: 24 + e.depth, knockback: 11 }); world.shake = 0.4; sfx('slam'); }, 1.0 * k);
-  } else if (move === 1) {
-    windup(e, { shape: 'circle', radius: 1.2, duration: 0.9 }, () => {
-      floatText(e.pos, 'RISE!', 'crit');
-      for (let i = 0; i < (enraged ? 4 : 2); i++) { const at = near(e.pos, 2.6); spawnEnemy('zombie', at.x, at.z, e.depth); }
-    }, 1.2);
-  } else {
-    const line = e.facing.clone();
-    windup(e, { shape: 'line', length: 8, width: 1.6, duration: 0.85 * k }, () => {
-      Object.assign(e, { state: 'charging', chargeT: 8 / 13, chargeHit: false, chargeDir: line, chargeSpeed: 13, chargeDmg: 22 + e.depth });
-    }, 0.3);
-  }
-}
 
 // A grunt that hits harder and slows you when it connects
 function drownedAI(e, p, dt) {
@@ -618,14 +557,6 @@ function dart(e) {
   }, e.chain > 0 ? 0 : 1.1 + Math.random() * 0.5);
 }
 
-// A long, straight thrust from outside sword reach
-function halberdAI(e, p, dt) {
-  if (!ready(e, dt)) return;
-  const d = face(e, p);
-  if (d > 3.2) return walk(e);
-  if (d < 1.4) return walk(e, -1); // keeps you at the end of the blade
-  windup(e, { shape: 'line', length: 3.6, width: 0.7, duration: 0.7 }, () => meleeArc(e, { range: 3.6, arc: 0.45, damage: 12 + e.depth, knockback: 6 }), 1.0);
-}
 
 // Lobs molten iron: it splashes where you stood, then the pool flares again
 function smelterAI(e, p, dt) {

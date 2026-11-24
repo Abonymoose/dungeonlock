@@ -4,7 +4,8 @@ import { hooks, damage, telegraph, fireProjectile } from './combat.js';
 import { createPuppet, TYPES } from './enemies.js';
 import { createPlayer, CLASSES, WEAPONS } from './classes.js';
 import { disposeObject } from './models.js';
-import { emote, emoteHooks } from './emote.js';
+import { emote, emoteHooks, EMOTES, COLORS } from './emote.js';
+import { basic } from './render.js';
 
 // Co-op: up to four players share a Dungeon run through a relay (server/relay.js) on Cloudflare.
 // The host runs the rooms and the enemies; every player runs their own hero, and sends where they are and what they hit.
@@ -74,14 +75,27 @@ export function leave() {
   try { ws?.close(1000, 'bye'); } catch { /* already gone */ }
 }
 
-export function hello(to = undefined) { send({ t: 'hello', to, name: net.me?.name, cls: net.me?.cls, weapon: net.me?.weapon }); }
-export const players = () => [{ id: net.id, name: net.me?.name, cls: net.me?.cls, host: net.host, me: true }, ...[...net.peers.values()].map((p) => ({ id: p.id, name: p.name, cls: p.cls, host: p.host }))];
+export function hello(to = undefined) { send({ t: 'hello', to, name: net.me?.name, cls: net.me?.cls, weapon: net.me?.weapon, color: net.me?.color, icon: net.me?.icon }); }
+export const players = () => [{ id: net.id, ...net.me, host: net.host, me: true },
+  ...[...net.peers.values()].map((p) => ({ id: p.id, name: p.name, cls: p.cls, weapon: p.weapon, color: p.color, icon: p.icon, host: p.host }))];
+
+// a ring in the player's color at a hero's feet, so teammates tell each other apart
+function markHero(e, color) {
+  const hex = (COLORS[color] ?? COLORS[0]).hex;
+  if (!e.netRing) {
+    e.netRing = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.56, 28), basic(hex, { transparent: true, opacity: 0.85, depthWrite: false }));
+    e.netRing.rotation.x = -Math.PI / 2;
+    e.netRing.position.y = 0.04;
+    e.model.root.add(e.netRing);
+  }
+  e.netRing.material.color.setHex(hex);
+}
 
 // ---- remote heroes: a puppet each, steered toward where its player says it is ----
 
 function peer(id) {
   let p = net.peers.get(id);
-  if (!p) { p = { id, name: 'Player', cls: 'knight', weapon: null, st: null, puppet: null, host: false }; net.peers.set(id, p); }
+  if (!p) { p = { id, name: 'Player', cls: 'knight', weapon: null, color: 0, icon: 8, st: null, puppet: null, host: false }; net.peers.set(id, p); }
   return p;
 }
 function dropPuppet(p) {
@@ -95,7 +109,8 @@ function puppetFor(p) {
   const cls = CLASSES[p.cls] ? p.cls : 'knight';
   const weapon = WEAPONS[cls].find((w) => w.id === p.weapon) ?? WEAPONS[cls][0];
   const e = createPlayer(cls, { vitality: 0, whetstone: 0, shards: 0, quickstep: 0 }, weapon);
-  Object.assign(e, { remote: true, peerId: p.id, netName: p.name });
+  Object.assign(e, { remote: true, peerId: p.id, netName: p.name, netColor: p.color, netIcon: p.icon });
+  markHero(e, p.color);
   e.pos.copy(world.room.entry ?? world.player.pos);
   p.puppet = e;
   (world.remotes ??= []).push(e);
@@ -179,8 +194,10 @@ function handle(m) {
       if (!from) return;
       const p = peer(from);
       p.name = clean(m.name); p.cls = CLASSES[m.cls] ? m.cls : 'knight'; p.weapon = typeof m.weapon === 'string' ? m.weapon : null;
-      if (p.puppet && (p.puppet.id !== p.cls)) dropPuppet(p);
-      if (p.puppet) p.puppet.netName = p.name;
+      p.color = Math.min(COLORS.length - 1, Math.max(0, num(m.color) | 0));
+      p.icon = Math.min(EMOTES.length - 1, Math.max(0, num(m.icon) | 0));
+      if (p.puppet && (p.puppet.id !== p.cls || p.puppet.cls.weapon?.id !== p.weapon)) dropPuppet(p);
+      if (p.puppet) { Object.assign(p.puppet, { netName: p.name, netColor: p.color, netIcon: p.icon }); markHero(p.puppet, p.color); }
       break;
     }
     case 'st': if (from) peer(from).st = { x: num(m.x), z: num(m.z), ry: num(m.ry, -10, 10), hp: num(m.hp, 0, 1e5), mx: num(m.mx, 1, 1e5), dead: !!m.dead, ready: !!m.ready, mv: num(m.mv, 0, 50) }; break;
@@ -267,6 +284,7 @@ export function netTick(dt, ready) {
   if (!net.inRun) return;
   const p = world.player;
   wrapAnims(p);
+  if (p) markHero(p, net.me?.color ?? 0);
   steerRemotes(dt);
   if ((stT -= dt) <= 0 && p) {
     stT = ST_EVERY;

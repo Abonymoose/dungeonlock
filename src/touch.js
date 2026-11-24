@@ -2,7 +2,7 @@ import { input, touch } from './input.js';
 
 // Phone controls: drag anywhere on the left half to move, diamond buttons on the right.
 // They only show after a touch and during play, so mouse and controller players never see them.
-const BUTTONS = { attack: 'ATTACK', dash: 'DASH', special: 'SPECIAL', cast: 'CAST', interact: 'USE', craft: 'CRAFT', pause: 'II' };
+const BUTTONS = { attack: 'ATTACK', dash: 'DASH', special: 'SPECIAL', cast: 'CAST', interact: 'USE', pause: 'II' };
 const R = 52; // CSS px of thumb travel for full speed
 
 const root = document.createElement('div');
@@ -75,11 +75,9 @@ addEventListener('click', (e) => {
 // once a frame: show the buttons that make sense right now
 export function updateTouch(world) {
   document.body.classList.toggle('touch-on', input.touch);
-  const on = input.touch && ['play', 'talk'].includes(world.state);
+  const on = input.touch && world.state === 'play';
   root.classList.toggle('hidden', !on);
   if (!on) { for (const id of [...holds.keys(), stickId]) release(id); return; }
-  root.classList.toggle('grounded', !!world.player?.cls.grounded);
-  root.classList.toggle('wild', world.room?.plan.kind === 'wild');
   root.classList.toggle('use', !prompt.classList.contains('hidden'));
   // turned upright mid-fight: stop the fight until the phone is sideways again
   if (innerHeight > innerWidth && world.state === 'play' && !world.player?.dead) touch.taps.add('pause');

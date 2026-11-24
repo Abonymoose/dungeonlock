@@ -16,14 +16,11 @@ import { disposeObject } from './models.js';
 import * as ui from './ui.js';
 import { sfx, applyVolume, playTrack } from './audio.js';
 import { exportSave, importSave } from './save.js';
-import { makeWild, buildWild, wildUpdate, RECIPES, canCraft, craft, costText } from './wild.js';
-import { CHAPTERS, ENDING, FORGE, chapterPlan, adventureUpdate, canForge, forgeCost, forge, applyForge, newAdventure } from './adventure.js';
-import { makePrincess } from './models.js';
 import { updateTouch } from './touch.js';
 import { keepPlan, furnishKeep, keepUpdate, VOWS, sworn, vowBonus } from './keep.js';
 import { earn } from './feats.js';
 import { net, coop, isHost, isGuest, connect, leave, hello, players, randomCode, send, netTick, placeRemotes, waitingOn, allDown, aliveRemote } from './net.js';
-import { updateTags, padEmotes } from './emote.js';
+import { updateTags, padEmotes, EMOTES, COLORS } from './emote.js';
 import { WARES, priceOf, furnishShop, BARGAINS, furnishShrine, furnishChest } from './shop.js';
 
 const CLASS_IDS = Object.keys(CLASSES);
@@ -82,7 +79,6 @@ const BANNERS = {
   shrine: ['THE SHRINE', 'The Lock will deal, for a price.'],
   chest: ['A CHEST', 'Locked tight. Something rattles inside.'],
   exit: ['THE LOCK', 'One key, one way out. Or go deeper.'],
-  wild: ['THE WILDS', 'Gather by day. Survive the night.'],
 };
 const REWARD_NAME = { boon: 'Boon', ash: 'Ash', key: 'Key', heal: 'Healing', pom: 'Keystone', shop: 'The Peddler', shrine: 'A Bargain', trial: 'A Trial', chest: 'A Chest' };
 
@@ -117,7 +113,6 @@ async function enterMenu(state) {
   ui.setPrompt(null);
   world.room = buildRoom(makePlan(0, 'start'), []);
   playTrack('keep'); // the menus share the Keep's quiet music
-  world.adventure = null;
   newPlayer();
   show(state);
   await ui.fadeTo(false);
@@ -135,7 +130,7 @@ function startRun(daily = null, wait = false) {
   world.player.lives = sworn(world.run, 'forsworn') ? 0 : anvil().lastbreath;
   ui.setSlots([]);
   if (wait) { world.state = 'transition'; ui.fadeTo(true); return; } // a co-op guest: the host sends the first room
-  enterRoom(menu.mode === 'open' ? makeWild() : makePlan(0, 'start'));
+  enterRoom(makePlan(0, 'start'));
 }
 
 async function enterRoom(plan) {
@@ -146,8 +141,7 @@ async function enterRoom(plan) {
   await ui.fadeTo(true);
   resetWorld();
   world.run.depth = plan.depth;
-  const room = world.room = plan.kind === 'wild' || plan.kind === 'field' ? buildWild(plan) : buildRoom(plan, plan.doorPlans ?? rollDoors(plan.depth, world.run));
-  if (plan.kind === 'wild' || plan.kind === 'field') playTrack(plan.kind === 'wild' ? 'wilds' : 'adventure');
+  const room = world.room = buildRoom(plan, plan.doorPlans ?? rollDoors(plan.depth, world.run));
   if (plan.kind === 'keep') furnishKeep(room);
   if (plan.kind === 'shop') furnishShop(room);
   if (plan.kind === 'shrine') furnishShrine(room);
@@ -187,7 +181,6 @@ async function enterRoom(plan) {
 
 function endRun(kind) {
   if (world.tutorial) return leaveTutorial(false); // the tutorial never banks or counts as a run
-  if (world.adventure) return adventureEnded(kind);
   if (world.run.keep) return enterMenu('playmenu'); // leaving the Keep isn't a run
   Math.random = realRandom;
   if (world.run.daily) postDaily(world.run, kind);
@@ -197,21 +190,18 @@ function endRun(kind) {
   meta.ash += ash;
   meta.runs++;
   if (kind === 'escaped') { meta.escapes++; earn('escape'); }
-  const wild = world.room?.plan.kind === 'wild';
-  if (wild) meta.bestNights = Math.max(meta.bestNights ?? 0, run.depth); // in the Wilds, depth counts nights survived
-  else meta.bestDepth = Math.max(meta.bestDepth, run.depth);
+  meta.bestDepth = Math.max(meta.bestDepth, run.depth);
   saveMeta();
   world.state = 'over';
   ui.setPrompt(null);
   ui.showHud(false);
   const secs = Math.round(world.time - (run.t0 ?? world.time));
-  ui.overScreen({ kind, className: world.player.cls.name, weapon: world.player.cls.weapon?.name, depth: run.depth, kills: run.kills, ash, wild,
+  ui.overScreen({ kind, className: world.player.cls.name, weapon: world.player.cls.weapon?.name, depth: run.depth, kills: run.kills, ash,
     time: `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`, boons: world.player.boons.length, feats: Object.keys(meta.feats ?? {}).length - (run.featsAtStart ?? 0) });
 }
 
 // The Keep: the room above the dungeon where Dungeon runs begin and end. Walk, talk, use the Anvil, take the gate.
 function enterKeep() {
-  world.adventure = null;
   world.run = { depth: 0, keys: 0, ash: meta.ash, kills: 0, boons: [], keyDoorsSeen: 0, xp: 0, level: 1, pendingLevels: 0, rerolls: 0, noXp: true, label: 'THE KEEP', keep: true };
   menu.look = {};
   ui.hideScreen();
@@ -252,19 +242,53 @@ function openVows(at = 0) {
 }
 
 // ---- co-op: the lobby, and what the host's messages do here ----
-const coopMe = () => ({ name: meta.name, cls: CLASS_IDS[menu.cls], weapon: equipped(CLASS_IDS[menu.cls], meta).id });
+const coopMe = () => ({ name: meta.name, cls: CLASS_IDS[menu.cls], weapon: equipped(CLASS_IDS[menu.cls], meta).id, color: meta.color ?? 0, icon: meta.icon ?? 8 });
+// rows marked cycle change with left and right (or Select); Name asks for a new one
 function lobbyView() {
-  const items = !net.code ? ['Host a game', 'Join a game', 'Back']
-    : [...(net.host ? ['Start the run'] : []), `Class: ${CLASSES[CLASS_IDS[menu.cls]].name}`, 'Leave'];
-  return { code: net.code, host: net.host, items, msg: menu.lobbyMsg ?? '', players: players().map((p) => ({ ...p, cls: CLASSES[p.cls]?.name ?? p.cls })) };
+  const id = CLASS_IDS[menu.cls], c = COLORS[meta.color ?? 0];
+  const profile = [
+    { id: 'name', label: `Name <b>${esc(meta.name)}</b>` },
+    { id: 'color', label: `Color <b style="color:${c.css}">&#9632; ${c.name}</b>`, cycle: true },
+    { id: 'icon', label: `Icon <span class="emo">${EMOTES[meta.icon ?? 8]}</span>`, cycle: true },
+    { id: 'class', label: `Class <b>${CLASSES[id].name}</b>`, cycle: true },
+    { id: 'weapon', label: `Weapon <b>${equipped(id, meta).name}</b>`, cycle: true },
+  ];
+  const items = !net.code ? [{ id: 'host', label: 'Host a game' }, { id: 'join', label: 'Join a game' }, ...profile, { id: 'back', label: 'Back' }]
+    : [...(net.host ? [{ id: 'start', label: 'Start the run' }] : []), ...profile, { id: 'leave', label: 'Leave' }];
+  const weaponName = (cls, wid) => (WEAPONS[cls]?.find((w) => w.id === wid) ?? WEAPONS[cls]?.[0])?.name ?? '';
+  return { code: net.code, host: net.host, items, msg: menu.lobbyMsg ?? '',
+    players: players().map((p) => ({ name: p.name, me: p.me, host: p.host, img: `class-${CLASSES[p.cls] ? p.cls : 'knight'}`, cls: CLASSES[p.cls]?.name ?? '', weapon: weaponName(p.cls, p.weapon),
+      color: (COLORS[p.color] ?? COLORS[0]).css, icon: EMOTES[p.icon] ?? '' })) };
+}
+function changeProfile(what, dir) {
+  const n = CLASS_IDS.length;
+  if (what === 'color') meta.color = ((meta.color ?? 0) + dir + COLORS.length) % COLORS.length;
+  if (what === 'icon') meta.icon = ((meta.icon ?? 8) + dir + EMOTES.length) % EMOTES.length;
+  if (what === 'class') menu.cls = (menu.cls + dir + n) % n;
+  if (what === 'weapon') {
+    const id = CLASS_IDS[menu.cls], mine = WEAPONS[id].filter((w) => owns(meta, w));
+    meta.gear = { ...meta.gear, [id]: mine[(mine.indexOf(equipped(id, meta)) + dir + mine.length) % mine.length].id };
+  }
+  if (what === 'class' || what === 'weapon') newPlayer();
+  profileChanged();
+}
+function editName() {
+  const name = (window.prompt('Your name (up to 16 letters):', meta.name ?? '') ?? '').trim().slice(0, 16);
+  if (!name) return;
+  meta.name = name;
+  profileChanged();
+}
+function profileChanged() {
+  saveMeta();
+  net.me = coopMe();
+  if (net.ws) hello();
+  sfx('menu');
+  RENDER.lobby();
 }
 function enterLobby() {
-  if (!meta.name) {
-    const name = (window.prompt('Your name for co-op (up to 16 letters):') ?? '').trim().slice(0, 16);
-    if (!name) return;
-    meta.name = name;
-    saveMeta();
-  }
+  meta.name ||= `Player ${100 + Math.floor(Math.random() * 900)}`;
+  menu.look = {};
+  newPlayer();
   menu.lobby = 0;
   menu.lobbyMsg = '';
   net.onChange = () => { if (world.state === 'lobby') RENDER.lobby(); };
@@ -386,7 +410,6 @@ function clearRoom() {
   for (const k of room.pickups.filter((k) => k.type === 'shard')) disposeObject(k.obj);
   room.pickups = room.pickups.filter((k) => k.type !== 'shard');
   world.player.ammo = world.player.maxAmmo;
-  if (world.adventure && kind === 'boss') return rescue();
   if (kind === 'trial') return trialReward(room);
   if (kind === 'chest') room.addPickup('bigash', room.center.x + 1.2, room.center.z - 1.2); // the ambush paid off
   const reward = kind === 'boss' ? 'bigash' : room.plan.reward;
@@ -398,7 +421,7 @@ function clearRoom() {
 // Feats a Dungeon room can earn: on entering it (depth) or on clearing it (the fight itself)
 function dungeonFeats(cleared) {
   const room = world.room, run = world.run, depth = room.plan.depth;
-  if (world.adventure || world.tutorial || run.keep || room.plan.kind === 'wild') return;
+  if (world.tutorial || run.keep) return;
   if (depth >= 10) earn('depth10');
   if (depth >= 11) earn('vaults');
   if (depth >= 20) earn('depth20');
@@ -504,7 +527,6 @@ function openKeystone() {
   });
 }
 
-// Crafting in the Wilds: the same pick-a-card screen, showing what each thing costs; Back closes it
 // The Peddler's stall: pay with the ash you carry this run; each ware once per visit
 function openShop() {
   const run = world.run, p = world.player, shop = world.room.shop, depth = world.room.plan.depth;
@@ -553,14 +575,6 @@ function openShrine() {
   });
 }
 
-function openCraft() {
-  openChoice({
-    header: { name: 'Crafting', title: 'Spend what you gathered', css: '#D4C5AC' },
-    items: RECIPES, cancel: true, canPick: canCraft,
-    toCard: (r) => ({ kind: 'CRAFT', name: r.name, desc: r.desc, note: canCraft(r) ? costText(r) : `Needs ${costText(r)}`, css: canCraft(r) ? '#D4C5AC' : '#6E2323' }),
-    onPick: craft,
-  });
-}
 
 function openPerks() {
   const run = world.run, p = world.player;
@@ -592,10 +606,9 @@ function roomFlow(dt) {
 function roomLogic(dt) {
   const room = world.room, run = world.run, p = world.player;
   roomFlow(dt);
-  let wildPrompt = null;
-  if (world.adventure) run.label = `CHAPTER ${world.adventure.chapter + 1}<br>${world.adventure.iron} IRON`;
+  let keepPrompt = null;
   // a Dungeon fight shows what is left of it under the depth
-  else if (!run.keep && !world.tutorial && room.plan.kind !== 'wild') {
+  if (!run.keep && !world.tutorial) {
     const left = world.enemies.filter((e) => !e.dead).length + world.pendingSpawns, waves = room.plan.waves.length;
     const debt = run.curse ? `<br><span class="red">${run.curse.name.toUpperCase()} (${run.curse.rooms})</span>` : '';
     const t = run.trial;
@@ -603,29 +616,13 @@ function roomLogic(dt) {
     const trial = t && !room.cleared ? `<br><span class="${trialFailed() ? 'red' : ''}">TRIAL: ${t.id === 'untouched' ? 'NO HITS' : Math.max(0, Math.ceil(t.limit - t.t)) + 's'}${trialFailed() ? ' FAILED' : ''}</span>` : '';
     run.label = (room.cleared || !waves ? `DEPTH ${room.plan.depth}` : `DEPTH ${room.plan.depth}<br>${left} LEFT${waves > 1 ? ` &nbsp;WAVE ${Math.max(1, room.waveIndex)} OF ${waves}` : ''}`) + trial + debt;
   }
-  if (room.plan.kind === 'field') {
-    const f = adventureUpdate(room);
-    if (f.exit) return finishChapter();
-    wildPrompt = f.prompt;
-  }
   if (room.plan.kind === 'keep') {
     const k = keepUpdate(room, p, dt);
     if (k.vows) return openVows();
-    wildPrompt = k.prompt;
+    keepPrompt = k.prompt;
     if (k.anvil) { menu.anvilFrom = 'keep'; return enterMenu('anvil'); }
   }
-  if (room.plan.kind === 'wild') {
-    const w = wildUpdate(dt);
-    wildPrompt = w.prompt;
-    if (w.dawn) {
-      if (run.wild.nights >= 5) earn('nights');
-      if (run.wild.survivedBlood) earn('bloodmoon');
-      ui.showBanner('DAWN', `You lived through night ${run.wild.nights}. Take a gift.`, 1800);
-      return openBoon(Object.keys(PATRONS)[Math.floor(Math.random() * Object.keys(PATRONS).length)]);
-    }
-    if (pressed('craft')) return openCraft();
-  }
-  // level-ups wait until nothing is left alive (the open world is never 'cleared' room by room)
+  // level-ups wait until nothing is left alive
   if (room.cleared && run.pendingLevels > 0 && !world.pendingSpawns && !world.enemies.some((e) => !e.dead)) return openPerks();
 
   for (let i = room.pickups.length - 1; i >= 0; i--) {
@@ -637,7 +634,7 @@ function roomLogic(dt) {
     if (world.state !== 'play') return;
   }
 
-  let prompt = wildPrompt;
+  let prompt = keepPrompt;
   const door = room.cleared && !room.pickups.some((k) => k.type !== 'shard') ? room.doorNear(p.pos) : null;
   // co-op: the host picks the door, once everyone has their reward
   const hold = coop() && door ? (isGuest() ? 'THE HOST PICKS THE DOOR' : waitingOn().length ? `WAITING FOR ${waitingOn().map((n) => esc(n).toUpperCase()).join(', ')}` : null) : null;
@@ -713,7 +710,7 @@ const RENDER = {
   anvil: () => ui.anvilScreen(UPGRADES, menu.anvil, meta),
   settings: () => ui.settingsScreen(settingRows(), menu.set, !!input.capture),
   codex: () => ui.codexScreen(TABS, menu.tab, codexBody(menu.tab)),
-  pause: () => ui.pauseScreen(menu.pause, world.player.cls, CAST, world.tutorial ? 'Leave the tutorial' : world.adventure ? 'Leave (your chapter is saved)' : world.run.keep ? 'Leave the Keep' : 'Abandon run', carriedBoons()),
+  pause: () => ui.pauseScreen(menu.pause, world.player.cls, CAST, world.tutorial ? 'Leave the tutorial' : world.run.keep ? 'Leave the Keep' : 'Abandon run', carriedBoons()),
   choice: () => renderChoice(),
 };
 function show(state) {
@@ -844,96 +841,6 @@ function activate(r) {
   }
 }
 
-// ---- adventure: The Swordsmith ----
-
-// Starts (or resumes) the story at the chapter you last reached; every chapter start is a checkpoint
-function startAdventure() {
-  const a = world.adventure = { ...(meta.adventure ?? newAdventure()) };
-  world.run = { depth: 0, keys: 0, ash: a.coin, kills: 0, boons: [], keyDoorsSeen: 0, xp: 0, level: 1, pendingLevels: 0, rerolls: 0, currency: 'COIN', noXp: true };
-  ui.hideScreen();
-  if (world.player) disposeObject(world.player.model.root);
-  world.player = createPlayer('smith', meta);
-  world.player.lives = 0;
-  ui.setSlots([]);
-  enterChapter();
-}
-
-async function enterChapter() {
-  const a = world.adventure, p = world.player;
-  meta.adventure = { chapter: a.chapter, coin: a.coin, iron: a.iron, edge: a.edge, reach: a.reach, mail: a.mail };
-  saveMeta();
-  world.run.ash = a.coin;
-  applyForge(p, a);
-  p.hp = p.maxHp; // a night's rest between chapters
-  await enterRoom(chapterPlan(a.chapter));
-  talk(CHAPTERS[a.chapter].lines);
-}
-
-// The way on: spend at your forge, then the next chapter
-function finishChapter() {
-  const a = world.adventure;
-  a.coin = world.run.ash;
-  a.chapter++;
-  ui.setPrompt(null);
-  openForge();
-}
-
-function openForge() {
-  const a = world.adventure;
-  world.run.ash = a.coin;
-  openChoice({
-    header: { name: 'Your Forge', title: `${a.coin} coin and ${a.iron} iron to spend before you go on`, css: '#D4C5AC' },
-    items: [...FORGE, { id: 'go', name: 'Set out', desc: `On to Chapter ${a.chapter + 1}: ${CHAPTERS[a.chapter].title}.` }],
-    canPick: (f) => f.id === 'go' || canForge(a, f),
-    toCard: (f) => f.id === 'go' ? { kind: 'ONWARD', name: f.name, desc: f.desc, css: '#E7D6BC' }
-      : { kind: `LEVEL ${a[f.id]}/3`, name: f.name, desc: f.desc, note: canForge(a, f) ? forgeCost(a, f) : `Needs ${forgeCost(a, f)}`, css: canForge(a, f) ? '#D4C5AC' : '#6E2323' },
-    onPick: (f) => {
-      if (f.id === 'go') return enterChapter();
-      forge(a, f);
-      sfx('slam');
-      openForge();
-    },
-  });
-}
-
-// The Black Knight is down: the princess, the last words, and home
-function rescue() {
-  const room = world.room, p = world.player, princess = makePrincess();
-  princess.root.position.copy(room.freeSpot(p.pos, 1.4, 3)); // near you, and never inside a centre pillar
-  princess.root.rotation.y = Math.atan2(p.pos.x - princess.root.position.x, p.pos.z - princess.root.position.z);
-  princess.anim.loop('idle');
-  scene.add(princess.root);
-  room.extras = [princess];
-  setTimeout(() => talk(ENDING, () => {
-    meta.adventureDone = true;
-    earn('story');
-    meta.adventure = null;
-    saveMeta();
-    disposeObject(princess.root);
-    enterMenu('playmenu').then(() => ui.showBanner('THE END', 'The princess is home, and the smith goes back to the forge.', 4000));
-  }), 1600);
-}
-
-// Falling sends you back to the start of the chapter; leaving keeps your checkpoint
-function adventureEnded(kind) {
-  if (kind === 'abandoned') return enterMenu('playmenu');
-  world.adventure = { ...meta.adventure };
-  world.state = 'over';
-  ui.setPrompt(null);
-  ui.showHud(false);
-  ui.overScreen({ kind: 'dead', adventure: CHAPTERS[world.adventure.chapter].title, className: 'Swordsmith', depth: world.adventure.chapter + 1, kills: world.run.kills, ash: 0 });
-}
-
-// Story lines, one at a time; the fight waits while people talk
-let talking = null;
-function talk(lines, then = null) {
-  if (!lines?.length) return then?.();
-  talking = { lines, i: 0, then, delay: 0.3 };
-  world.state = 'talk';
-  ui.setPrompt(null);
-  ui.dialogue(lines[0]);
-}
-
 // ---- tutorial ----
 
 async function beginTutorial() {
@@ -959,19 +866,6 @@ function leaveTutorial(done) {
 const STATES = {
   transition() {},
 
-  talk(dt) {
-    world.room?.extras?.forEach((m) => m.anim.update(dt));
-    if ((talking.delay -= dt) > 0) return;
-    if (!confirmed() && !pressed('attack')) return;
-    talking.delay = 0.2;
-    if (++talking.i < talking.lines.length) return ui.dialogue(talking.lines[talking.i]);
-    ui.dialogue(null);
-    world.state = 'play';
-    const then = talking.then;
-    talking = null;
-    then?.();
-  },
-
   home() {
     if (navigate('home', 3)) return RENDER.home();
     if (confirmed()) { sfx('menu'); show(['playmenu', 'settings', 'codex'][menu.home]); menu.settingsFrom = 'home'; }
@@ -983,13 +877,10 @@ const STATES = {
     if (!confirmed()) return;
     const card = ui.PLAY_CARDS[menu.play];
     if (card === 'tutorial') return beginTutorial();
-    if (card === 'adventure') return startAdventure();
     if (card === 'daily') return startDaily();
     if (card === 'coop') return enterLobby();
-    menu.mode = card === 'open' ? 'open' : 'dungeon';
-    if (menu.mode === 'dungeon') return enterKeep();
-    menu.titleFrom = 'playmenu';
-    show('title');
+    menu.mode = 'dungeon';
+    return enterKeep();
   },
 
   title(dt) {
@@ -1118,21 +1009,18 @@ const STATES = {
     menu.lobby = Math.min(menu.lobby ?? 0, items.length - 1);
     if (navigate('lobby', items.length)) return RENDER.lobby();
     if (pressed('back')) { leave(); return show('playmenu'); }
+    const it = items[menu.lobby];
+    const dir = pressed('right') ? 1 : pressed('left') ? -1 : 0;
+    if (it.cycle && dir) return changeProfile(it.id, dir);
     if (!confirmed()) return;
-    const pick = items[menu.lobby];
     sfx('menu');
-    if (pick === 'Host a game') return hostGame();
-    if (pick === 'Join a game') return joinGame();
-    if (pick === 'Back') return show('playmenu');
-    if (pick === 'Leave') { leave(); return show('playmenu'); }
-    if (pick.startsWith('Class')) {
-      menu.cls = (menu.cls + 1) % CLASS_IDS.length;
-      newPlayer();
-      net.me = coopMe();
-      hello();
-      return RENDER.lobby();
-    }
-    if (pick === 'Start the run') {
+    if (it.id === 'host') return hostGame();
+    if (it.id === 'join') return joinGame();
+    if (it.id === 'back') return show('playmenu');
+    if (it.id === 'leave') { leave(); return show('playmenu'); }
+    if (it.id === 'name') return editName();
+    if (it.cycle) return changeProfile(it.id, 1);
+    if (it.id === 'start') {
       menu.mode = 'coop';
       net.inRun = true;
       send({ t: 'start' });
@@ -1142,7 +1030,6 @@ const STATES = {
 
   over() {
     if (!confirmed()) return;
-    if (world.adventure) return startAdventure(); // back to the start of the chapter you fell in
     if (menu.mode === 'coop') return enterMenu('playmenu');
     if (menu.mode === 'dungeon') return enterKeep(); // a Dungeon run ends back in the Keep
     menu.titleFrom = 'playmenu';
@@ -1167,7 +1054,7 @@ export function frame(dt) {
   // lean the camera a fifth of the way toward the arena's middle, so the edges show less void
   // on the home screen the camera sits left of the character, so they stand clear of the menu
   const hero = coop() && world.player?.dead ? (aliveRemote() ?? world.player) : world.player;
-  const target = world.state === 'home' ? world.player?.pos.clone().addScaledVector(GROUND_RIGHT, -3.2) : world.room && !['wild', 'field'].includes(world.room.plan.kind) ? hero?.pos.clone().lerp(world.room.center, 0.2) : hero?.pos;
+  const target = world.state === 'home' ? world.player?.pos.clone().addScaledVector(GROUND_RIGHT, -3.2) : world.room ? hero?.pos.clone().lerp(world.room.center, 0.2) : hero?.pos;
   if (target) updateCamera(dt, target);
   updateLights(dt, performance.now() / 1000);
 }

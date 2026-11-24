@@ -4,7 +4,6 @@ import { frame } from '../src/main.js';
 import { world as W } from '../src/world.js';
 import { createPlayer } from '../src/classes.js';
 import { meta, makePlan } from '../src/run.js';
-import { makeWild, SIZE } from '../src/wild.js';
 import { torchLights, GROUND_RIGHT } from '../src/render.js';
 import { audio } from '../src/audio.js';
 import { settings, resetControls } from '../src/settings.js';
@@ -40,7 +39,6 @@ export async function toTitle() {
   for (let i = 0; i < 24 && W.state !== 'title'; i++) {
     if (W.state === 'over') press(0);
     else if (W.state === 'home' || W.state === 'playmenu') clickSel(0); // the Dungeon card leads into the Keep
-    else if (W.state === 'talk') press(0);
     else if (W.state === 'play' && W.room?.plan.kind === 'keep') { W.player.pos.copy(W.room.doors[0].pos); step(0.1); } // walk into the gate
     await sleep(250);
   }
@@ -53,7 +51,6 @@ export async function toPlayMenu() {
     if (W.state === 'title' || W.state === 'anvil') press(1);
     else if (W.state === 'over') press(0);
     else if (W.state === 'home') clickSel(0);
-    else if (W.state === 'talk') press(0);
     else if (W.state === 'play' && W.room?.plan.kind === 'keep') { press(9); step(0.05); if (W.state === 'pause') clickSel(1); } // pause, then Leave the Keep
     await sleep(250);
     step(0.05);
@@ -212,76 +209,9 @@ export async function bestiary() {
   return results;
 }
 
-// The Wilds: an island with the start on dry land; gathering fills the pack; crafting spends it and builds;
-// night raises zombies, dawn burns them and offers a boon; dying counts nights survived
-export async function wilds() {
-  const results = [];
-  const plan = makeWild(), kinds = [0, 0, 0, 0, 0, 0];
-  for (const k of plan.ground) kinds[k]++;
-  const mid = (SIZE / 2) * SIZE + SIZE / 2;
-  check(results, 'the island has sea, forest and rock, and starts on land', kinds[0] > 2000 && kinds[4] > 400 && kinds[5] > 200 && plan.ground[mid] !== 0, kinds.join('/'));
-
-  await toPlayMenu();
-  clickSel(1); // Open World
-  press(0);
-  await waitFor('play');
-  const room = W.room, w = W.run.wild;
-  check(results, 'the Wilds start from the third card', room?.plan.kind === 'wild', room?.plan.kind);
-  if (room?.plan.kind !== 'wild') return results;
-  W.player.maxHp = W.player.hp = 99999;
-  W.run.xp = -1e9; // no level-up menu mid-test
-  check(results, 'thousands of trees and rocks to gather', room.nodes.length > 1000, room.nodes.length + ' nodes');
-
-  // a tree with nothing else close, so every press lands on it (Use takes the nearest node)
-  const tree = room.nodes.find((n) => n.kind === 'tree' && !room.nodes.some((o) => o !== n && Math.hypot(o.x - n.x, o.z - n.z) < 2.5));
-  W.player.pos.set(tree.x + 0.8, 0, tree.z);
-  step(0.05);
-  for (let i = 0; i < 3; i++) press(5); // Use
-  check(results, 'chopping a tree three times gives 3 wood and fells it', w.mats.wood === 3 && w.mats.stone + w.mats.fiber === 0 && !room.nodes.includes(tree), `wood ${w.mats.wood}, stone ${w.mats.stone}, fiber ${w.mats.fiber}`);
-
-  Object.assign(w.mats, { wood: 20, stone: 20, fiber: 20 });
-  W.player.pos.copy(room.entry);
-  step(0.05);
-  press(8); // craft
-  step(0.5);
-  check(results, 'the craft button opens crafting', W.state === 'choice');
-  press(0); // the first recipe is the campfire
-  step(0.2);
-  check(results, 'crafting a campfire spends wood and stone and lights it', room.fires.length === 1 && w.mats.wood === 15 && w.mats.stone === 18 && room.lightSpots.length === 1, `${w.mats.wood} wood`);
-  press(8);
-  step(0.5);
-  press(1); // back closes it without crafting
-  step(0.1);
-  check(results, 'back closes crafting', W.state === 'play' && w.mats.wood === 15);
-
-  W.player.pos.set(room.entry.x + 30, 0, room.entry.z); // well away from the fire
-  W.player.pos.copy(room.freeSpot(W.player.pos, 0, 6));
-  w.clock = 0.619;
-  step(0.2);
-  for (let t = 0; t < 12 && !W.enemies.some((e) => !e.dead); t += 0.5) step(0.5);
-  check(results, 'night raises zombies', w.nights === 1 && W.enemies.some((e) => !e.dead && e.type === 'zombie'), `night ${w.nights}`);
-  w.clock = 0.9499;
-  step(0.1);
-  check(results, 'dawn burns them and offers a boon', W.enemies.every((e) => e.dead) && W.state === 'choice' && W.run.depth === 1, W.state);
-  step(0.5);
-  press(0);
-  step(0.2);
-
-  W.player.hp = 0; W.player.dead = true;
-  step(3);
-  check(results, 'dying ends the run with nights survived', W.state === 'over' && /Nights survived/.test(document.querySelector('#screen').textContent), W.state);
-  // a finished run returns to class select in the same mode, so pick the Dungeon card again for the other tests
-  press(0);
-  await waitFor('title');
-  press(1);
-  step(0.1);
-  clickSel(0);
-  return results;
-}
-
+// picks the first card on every choice screen until play resumes
 const takeChoices = () => { while (W.state === 'choice') { step(0.5); press(0); step(0.1); } };
 
-// Plays a whole run start to finish, unkillable, always taking the first door and the first card offered
 export async function fullRun(maxRooms = 14) {
   await toTitle();
   press(0);
@@ -313,7 +243,7 @@ export async function fullRun(maxRooms = 14) {
 export async function tutorial() {
   const results = [], t = () => W.tutorial;
   await toPlayMenu();
-  clickSel(5); // Tutorial
+  clickSel(3); // Tutorial
   await waitFor('play');
   for (let i = 0; i < 50 && !W.tutorial; i++) await sleep(100); // it starts once the fade-in finishes
   check(results, 'tutorial starts', !!W.tutorial, W.room?.plan.kind);
@@ -405,84 +335,6 @@ export async function saves() {
   refuses('keys that are not ours', JSON.stringify({ game: 'dungeonlock', data: { 'evil.key': '{}' } }));
   refuses('a damaged value', JSON.stringify({ game: 'dungeonlock', data: { 'dungeonlock.meta.v1': '{broken' } }));
   refuses('a huge file', 'x'.repeat(300000));
-  return results;
-}
-
-// Adventure: the fourth card starts the story as the swordsmith; his moves are grounded; chapter 1's ambush must be
-// beaten before the way on opens; the forge spends coin and keeps its work; a fall restarts the chapter; the tower ends it
-export async function adventure() {
-  const results = [];
-  const { saveMeta } = await import('../src/run.js');
-  const { damage } = await import('../src/combat.js');
-  meta.adventure = null; meta.adventureDone = false; saveMeta();
-  const until = async (cond, ms = 8000) => { for (let t = 0; t < ms && !cond(); t += 100) { await sleep(100); step(0.02); } return cond(); };
-  const skipTalk = () => { for (let i = 0; i < 20 && W.state === 'talk'; i++) { step(0.35); press(0); } };
-  const tough = () => { W.player.maxHp = W.player.hp = 99999; };
-
-  await toPlayMenu();
-  clickSel(2); // Adventure
-  await until(() => W.state === 'talk');
-  check(results, 'the fourth card starts the story as the swordsmith', W.state === 'talk' && W.player.cls.name === 'Swordsmith' && W.room?.plan.kind === 'field', W.state);
-  skipTalk();
-  check(results, 'story lines play, then the fight', W.state === 'play', W.state);
-  tough();
-
-  const p = W.player, from = p.pos.clone();
-  p.facing.set(1, 0, 0);
-  press(3); press(1); // Special, then Cast: neither does anything
-  const spc = p.spcCd;
-  press(0); // Dash
-  step(0.3);
-  check(results, 'no Cast, no Special, and Dash steps back', p.maxAmmo === 0 && spc <= 0 && p.pos.x < from.x - 0.4, `moved ${(p.pos.x - from.x).toFixed(2)}`);
-  step(0.8); // the step comes back
-  pad.axes[0] = 1; // walking right on the stick
-  frame(1 / 60);
-  press(0);
-  pad.axes[0] = 0;
-  check(results, 'Dash steps the way you walk', p.dashDir.dot(GROUND_RIGHT) > 0.9, p.dashDir.toArray().map((v) => v.toFixed(2)).join(','));
-
-  const plan = W.room.plan, ambush = plan.triggers[0];
-  p.pos.set(plan.exit[0], 0, plan.exit[1]);
-  step(0.3);
-  check(results, 'the way on stays shut while the ambush waits', W.state === 'play' && ambush.state !== 'done');
-  p.pos.set(ambush.at[0], 0, ambush.at[1]);
-  for (let i = 0; i < 40 && ambush.state !== 'done'; i++) { step(0.5); for (const e of W.enemies.filter((x) => !x.dead)) damage(e, 1e6, e.pos); }
-  step(2);
-  check(results, 'bandits ambush on the road and fall to the sword', ambush.state === 'done' && W.run.kills >= 2, `kills ${W.run.kills}`);
-  p.pos.set(plan.exit[0], 0, plan.exit[1]);
-  step(0.2);
-  check(results, 'the way on opens onto your forge', W.state === 'choice', W.state);
-
-  Object.assign(W.adventure, { coin: 60, iron: 10 });
-  step(0.5);
-  press(0); // the first card: Hone the Edge
-  step(0.5);
-  check(results, 'the forge spends coin and iron', W.adventure.edge === 1 && W.adventure.coin === 52 && W.adventure.iron === 9, `edge ${W.adventure.edge}, coin ${W.adventure.coin}`);
-  for (let i = 0; i < 3; i++) press(15);
-  press(0); // Set out
-  await until(() => W.state === 'talk' && W.adventure.chapter === 1);
-  check(results, 'chapter 2 starts with the forge work kept and saved', W.room.plan.kind === 'field' && p.mods.atk === 1.25 && meta.adventure?.chapter === 1 && meta.adventure.edge === 1, `chapter ${meta.adventure?.chapter}`);
-  skipTalk();
-
-  W.player.hp = 0; W.player.dead = true;
-  step(2);
-  check(results, 'falling shows the chapter screen', W.state === 'over' && /Chapter/.test(document.querySelector('#screen').textContent), W.state);
-  const last = (await import('../src/adventure.js')).CHAPTERS.length - 1;
-  meta.adventure.chapter = last; // straight to the tower
-  press(0);
-  await until(() => W.state === 'talk' && W.adventure.chapter === last);
-  check(results, 'a fall restarts from the saved chapter', W.room.plan.kind === 'boss' && W.adventure.edge === 1, W.room?.plan.kind);
-  skipTalk();
-  tough();
-  await until(() => W.enemies.some((e) => !e.dead && e.type === 'blackknight'));
-  check(results, 'the Black Knight waits in the tower', document.querySelector('#boss .name').textContent === 'THE BLACK KNIGHT');
-  for (let i = 0; i < 20 && W.enemies.some((e) => !e.dead); i++) { for (const e of W.enemies.filter((x) => !x.dead)) damage(e, 1e6, e.pos); step(0.5); }
-  await until(() => W.state === 'talk', 5000);
-  check(results, 'his fall brings the princess and the last words', W.state === 'talk' && W.room.extras?.length === 1, W.state);
-  skipTalk();
-  await until(() => W.state === 'playmenu');
-  check(results, 'the ending marks the adventure completed', W.state === 'playmenu' && meta.adventureDone === true && !meta.adventure, W.state);
-  clickSel(0); // back toward Dungeon mode for the other tests
   return results;
 }
 
@@ -639,42 +491,6 @@ export async function gale() {
   return results;
 }
 
-// The Wilds' newer recipes: stew and charm change you, a torch post lights the ground, spikes cut the dead
-export async function crafts() {
-  const results = [];
-  const { RECIPES, craft } = await import('../src/wild.js');
-  const r = (id) => RECIPES.find((x) => x.id === id);
-  await toPlayMenu();
-  clickSel(1); // Open World
-  press(0);
-  await waitFor('play');
-  const p = W.player, room = W.room;
-  Object.assign(W.run.wild.mats, { wood: 50, stone: 50, fiber: 50 });
-  const hp = p.maxHp, ammo = p.maxAmmo;
-  craft(r('stew'));
-  craft(r('charm'));
-  check(results, 'stew and the charm make you tougher', p.maxHp === hp + 15 && p.maxAmmo === ammo + 1, `${p.maxHp} hp, ${p.maxAmmo} shards`);
-  const fires = room.fires.length;
-  craft(r('torch'));
-  check(results, 'a torch post lights the ground', room.fires.length === fires + 1 && room.fires.at(-1).torch === true);
-  p.facing.set(0, 0, 1);
-  craft(r('spikes'));
-  const s = room.spikes.at(-1);
-  p.pos.x += 4; // stand clear, so the zombie stays on the stakes
-  spawnEnemy('zombie', s.x, s.z, 1);
-  step(2);
-  const z = W.enemies.find((e) => !e.dead && e.type === 'zombie' && Math.hypot(e.pos.x - s.x, e.pos.z - s.z) < 1);
-  if (z) { Object.assign(z, { timer: 99, state: 'recover', speed: 0 }); z.pos.set(s.x, 0, s.z); }
-  const before = z?.hp ?? 0;
-  step(1.2);
-  check(results, 'spike traps cut the dead', !!z && (z.dead || z.hp < before), z ? `${before} -> ${z.hp}` : 'no zombie');
-  p.hp = 0; p.dead = true;
-  step(3);
-  await toPlayMenu();
-  clickSel(0); // back to the Dungeon card for the other tests
-  return results;
-}
-
 // The Necromancer's raised dead: they rise on his Special, hurt enemies on their own, and crumble when their time is up
 export async function allies() {
   const results = [];
@@ -766,29 +582,6 @@ export async function dodge() {
   check(results, 'and your next hits land harder', before - g.hp >= 14, `${before - g.hp}`);
   p.hp = 0; p.dead = true;
   step(3);
-  return results;
-}
-
-// The Grave Lord rises on the fifth night in the Wilds, with a boss bar
-export async function graveLord() {
-  const results = [];
-  await toPlayMenu();
-  clickSel(1); // Open World
-  press(0);
-  await waitFor('play');
-  W.player.maxHp = W.player.hp = 99999;
-  const w = W.run.wild;
-  w.nights = 4;
-  w.clock = 0.6;
-  for (let i = 0; i < 40 && !W.enemies.some((e) => e.type === 'gravelord' && !e.dead); i++) step(0.25);
-  const g = W.enemies.find((e) => e.type === 'gravelord' && !e.dead);
-  check(results, 'the Grave Lord rises on night five', !!g && w.nights === 5, `night ${w.nights}`);
-  step(0.2);
-  check(results, 'he gets a boss bar', /GRAVE LORD/.test(document.querySelector('#boss .name').textContent) && !document.getElementById('boss').classList.contains('hidden'));
-  W.player.hp = 0; W.player.dead = true;
-  step(3);
-  await toPlayMenu();
-  clickSel(0); // back to the Dungeon card
   return results;
 }
 
