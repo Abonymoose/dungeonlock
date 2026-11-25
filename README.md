@@ -2,27 +2,18 @@
 
 *Not everything unlocks.*
 
-A torchlit, isometric pixel-art action game that runs in the browser. You can fight down through a dungeon, survive nights on a wild island, or play a short story as a village swordsmith. It is built with plain JavaScript and three.js, with no build step.
+A torchlit, isometric pixel-art action game that runs in the browser. You fight down through a dungeon alone, on the Daily Run, or with up to three friends in Co-op. It is built with plain JavaScript and three.js, with no build step.
 
 **Play:** [dungeonlock.pages.dev](https://dungeonlock.pages.dev) (mirror: [play.dungeonlock.workers.dev](https://play.dungeonlock.workers.dev))
 **Wiki:** [dungeonwiki.pages.dev](https://dungeonwiki.pages.dev)
 
 It works with a keyboard and mouse, with a controller, or on a phone held sideways.
 
-## Three ways to play
+## How it plays
 
-<table>
-<tr>
-<td width="33%"><img src="assets/shots/card-dungeon.png" alt="A Dungeon room with spike traps"></td>
-<td width="33%"><img src="assets/shots/card-open.png" alt="Night in the Wilds: a campfire with zombies closing in"></td>
-<td width="33%"><img src="assets/shots/card-adventure.png" alt="The swordsmith at the castle gate at dusk"></td>
-</tr>
-<tr>
-<td valign="top"><b>The Dungeon</b><br>Start in the Keep, pick one of five classes (Knight, Rogue, Wizard, Barbarian, Necromancer) and one of their three weapons, and descend. Seven patrons offer boons for your moves, each with its own status: Burn, Chill, Corrode, Hex, Shock, Doom and Mark. A boss waits at depth 9, and the Lock after it needs a key. Below the first Lock the dungeon floods into the Sunken Vaults, ruled by the Drowned King. Below the second Lock the Ember Forges burn, ruled by the Forgemaster. Elites carry affixes. Spend run ash at the Peddler, strike a bargain at a Shrine, take on a Trial, or gamble on a Chest. Swear Vows in the Keep for harder runs and more ash, play the Daily Run and post your score to the shared board, or bring up to three friends in Co-op and talk in emojis. Ash from each run buys lasting upgrades and new weapons, and Feats pay out more.</td>
-<td valign="top"><b>The Wilds</b> (beta)<br>A huge island of meadow, forest, rock and lakes. Gather wood, stone and fiber by day and craft campfires, torches, barricades, spike traps, stew and more. When night falls, the dead rise. Every third night is a Blood Moon, and every fifth brings the Grave Lord.</td>
-<td valign="top"><b>Adventure</b><br>Eight chapters as a village swordsmith with no magic, only one sword. Go from your forge, down the King's Road and into the castle to fight the Black Knight and rescue the princess. Each chapter start is saved.</td>
-</tr>
-</table>
+<img src="assets/shots/card-dungeon.png" alt="A Dungeon room with spike traps" width="300" align="right">
+
+Start in the Keep, pick one of five classes (Knight, Rogue, Wizard, Barbarian, Necromancer) and one of their three weapons, and descend. Seven patrons offer boons for your moves, each with its own status: Burn, Chill, Corrode, Hex, Shock, Doom and Mark. A boss waits at depth 9, and the Lock after it needs a key. Below the first Lock the dungeon floods into the Sunken Vaults, ruled by the Drowned King. Below the second Lock the Ember Forges burn, ruled by the Forgemaster. Elites carry affixes. Spend run ash at the Peddler, strike a bargain at a Shrine, take on a Trial, or gamble on a Chest. Swear Vows in the Keep for harder runs and more ash, play the Daily Run and post your score to the shared board, or bring up to three friends in Co-op and talk in emojis. Ash from each run buys lasting upgrades and new weapons, and Feats pay out more.
 
 New players can start with the **Tutorial** card on the Play menu. It teaches the moves in one quiet room.
 
@@ -37,7 +28,6 @@ New players can start with the **Tutorial** card on the Play menu. It teaches th
 | Cast | Q or L | B | CAST |
 | Dash | Space or Shift | A | DASH |
 | Use | E | RB | USE |
-| Craft (Wilds) | Tab or C | View | CRAFT |
 | Pause | Esc | Start | II |
 
 You can rebind keys and buttons in Settings. Settings can also export your progress to a file and import it back.
@@ -68,16 +58,14 @@ src/
   emote.js        quick chat: number keys to emojis over your head, names and health over other players
   feats.js        Feats: one-time goals that pay ash
   shop.js         the Peddler's wares, the Shrine's bargains and the Chest room
-  classes.js      the five classes, their weapons, and the Swordsmith
+  classes.js      the five classes and their weapons
   enemies.js      every enemy and boss, and their AI
   combat.js       hits, projectiles, telegraphs and effects
   boons.js        patrons and boons
   room.js, run.js dungeon rooms, layouts, runs and saves
-  wild.js         the Wilds: island, day and night, crafting
-  adventure.js    Adventure chapters and the forge
   codex.js        in-game Codex, also used to build the wiki
   save.js         save file export and import
-assets/           KayKit and Quaternius models, music, and screenshots for the menus
+assets/           KayKit models, music, and screenshots for the menus
 wiki/             the wiki site (generated from src/codex.js)
 test/             browser test harness and screenshot tools
 ```
@@ -91,19 +79,15 @@ const T = await import('/test/harness.js');
 await T.smoke();          // a run with each class
 await T.bestiary();       // every enemy acts and dies
 await T.tutorial();
-await T.wilds();
-await T.adventure();
 await T.touchControls();  // the phone controls
 await T.hardcore();
 await T.keep();           // the Keep between runs
 await T.feats();
 await T.gale();           // the fifth patron's Shock
-await T.crafts();         // the Wilds' newer recipes
 await T.allies();         // the Necromancer's raised dead
 await T.shop();           // the Peddler
 await T.shrine();         // a Shrine's bargain
 await T.dodge();          // perfect dodges
-await T.graveLord();      // the Wilds' boss night
 await T.patrons();        // Knell's Doom, Vigil's Mark, the boon screens, and patron doors
 await T.rooms();          // door signs, Trials, Chests and the Ember Forges
 await T.saves();
@@ -116,7 +100,7 @@ To rebuild the wiki after changing game data, run `await (await import('/test/sh
 
 ## Co-op
 
-The Co-op card runs a Dungeon run for up to four players. `server/relay.js` is a Cloudflare Worker at wss://dungeonrelay.dungeonlock.workers.dev with one Durable Object per four-letter room code; it only passes messages along. The host's game runs the rooms and the enemies, every player runs their own hero, and hits travel both ways. Quick chat (number keys, or the speech bubble on a phone) sends emojis to everyone.
+The Co-op card runs a Dungeon run for up to four players. In the lobby each player sets a name, a color, an emoji icon, a class and a weapon, and everyone in the room sees them. `server/relay.js` is a Cloudflare Worker at wss://dungeonrelay.dungeonlock.workers.dev with one Durable Object per four-letter room code; it only passes messages along. The host's game runs the rooms and the enemies, every player runs their own hero, and hits travel both ways. Quick chat (number keys, or the speech bubble on a phone) sends emojis to everyone.
 
 ## The daily leaderboard
 
@@ -132,8 +116,7 @@ This copies only `index.html`, `src/` and `assets/` into `dist/`. Tests and tool
 
 ## Credits
 
-- Characters, dungeon, forest and medieval pieces: [KayKit](https://kaylousberg.com) by Kay Lousberg (CC0)
-- Zombies: [Quaternius](https://quaternius.com) (CC0)
-- Music, all CC0 from [OpenGameArt](https://opengameart.org): "Dungeon Ambience" by yd, "Heavy Dungeon" by MintoDog, "Dark Cavern Ambient" by Paul Wortmann, "Dark Shrine Loop" by qubodup, "Dark Forest Theme" by cynicmusic, and "Medieval: The Bard's Tale" by RandomMind (see `assets/music/LICENSE.txt`)
+- Characters, dungeon pieces and the Keep's weapon rack: [KayKit](https://kaylousberg.com) by Kay Lousberg (CC0)
+- Music, all CC0 from [OpenGameArt](https://opengameart.org): "Dungeon Ambience" by yd, "Heavy Dungeon" by MintoDog, "Dark Cavern Ambient" by Paul Wortmann, and "Dark Shrine Loop" by qubodup (see `assets/music/LICENSE.txt`)
 - Font: [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P) by CodeMan38 (OFL)
 - Rendering: [three.js](https://threejs.org)
