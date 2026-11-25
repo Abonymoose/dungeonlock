@@ -376,7 +376,7 @@ function attachLogic(room) {
   room.doorNear = (pos, range = 1.3) => room.doors.find((d) => d.pos.distanceTo(pos) < range) ?? null;
 
   room.addPickup = (type, x, z, patron = null) => {
-    const m = makeIcon(patron ? PATRONS[patron].color : type === 'bigash' ? 'ash' : type);
+    const m = makeIcon(patron ? PATRONS[patron].color : type === 'bigash' ? 'ash' : type === 'echo' ? 0x7fb2d9 : type); // an Echo's orb is ghost-blue
     m.root.position.set(x, 0, z);
     if (type === 'bigash') m.root.scale.setScalar(1.6);
     scene.add(m.root);

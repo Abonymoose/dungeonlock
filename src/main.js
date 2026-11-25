@@ -149,6 +149,14 @@ async function enterRoom(plan) {
   // a Trial names its condition as you walk in; pass it for an Epic boon
   world.run.trial = plan.kind === 'trial' ? pick(TRIALS(plan)) : null;
   if (world.run.trial) plan.banner = ['TRIAL', world.run.trial.desc];
+  const echo = meta.echo;
+  if (echo && !world.run.echoMet && !world.run.daily && !coop() && ['combat', 'elite'].includes(plan.kind) && plan.depth >= echo.depth) {
+    world.run.echoMet = true;
+    plan.echo = true;
+    plan.waves = [['echo']];
+    dressEcho(echo);
+    plan.banner = ['YOUR ECHO', `Your ${CLASSES[echo.cls].name} fell here. It remembers.`];
+  }
   world.run.hurt = false;
   dungeonFeats(false);
   const p = world.player;
@@ -183,6 +191,11 @@ function endRun(kind) {
   if (world.tutorial) return leaveTutorial(false); // the tutorial never banks or counts as a run
   if (world.run.keep) return enterMenu('playmenu'); // leaving the Keep isn't a run
   Math.random = realRandom;
+  // a solo hero who dies carrying boons leaves an Echo at that depth for the next run (it replaces any older one)
+  const fallen = world.player;
+  if (kind === 'dead' && !world.run.daily && !coop() && fallen.boons.length && world.run.depth >= 2) {
+    meta.echo = { cls: CLASS_IDS[menu.cls], weapon: fallen.cls.weapon?.id, depth: world.run.depth, boons: fallen.boons.map((b) => ({ id: b.id, rarity: b.rarity, level: b.level })) };
+  }
   if (world.run.daily) postDaily(world.run, kind);
   if (isHost()) send({ t: 'end', kind });
   if (net.code) leave(); // a co-op run ends for everyone together
@@ -207,7 +220,7 @@ function enterKeep() {
   ui.hideScreen();
   newPlayer();
   ui.setSlots([]);
-  return enterRoom(keepPlan());
+  return enterRoom(keepPlan()).then(() => meta.echo && ui.toast(`<b>YOUR ECHO WAITS</b><span>Your ${CLASSES[meta.echo.cls].name} fell at depth ${meta.echo.depth}.</span>`));
 }
 
 // ---- room flow ----
@@ -394,6 +407,36 @@ function openChest(room, ambush = Math.random() >= 0.55) {
   world.run.ambush = true;
 }
 
+// The Echo wears your fallen hero's class and weapon, fights in their style, and hits harder for every boon they carried.
+// shortcut: one Echo per run, so it sets the shared TYPES.echo entry; give it per-enemy fields if two ever meet.
+function dressEcho(echo) {
+  const w = WEAPONS[echo.cls].find((x) => x.id === echo.weapon) ?? WEAPONS[echo.cls][0], cls = armed(echo.cls, w);
+  Object.assign(TYPES.echo, {
+    model: () => cls.model(cls.weapon), name: `Echo of your ${cls.name}`, power: echo.boons.length,
+    hp: 150 + 15 * echo.boons.length, style: ['wizard', 'necromancer'].includes(echo.cls) ? 'caster' : 'melee',
+  });
+}
+function openEcho() {
+  const p = world.player, echo = meta.echo, run = world.run;
+  meta.echo = null; // laid to rest
+  saveMeta();
+  earn('echo');
+  const items = (echo?.boons ?? []).filter((b) => BOONS[b.id] && !p.boons.some((x) => x.id === b.id)).sort(() => Math.random() - 0.5).slice(0, 3);
+  if (!items.length) { run.ash += 60; floatText(p.pos, '+60 ash', 'ash'); return world.room.openDoors(); }
+  openChoice({
+    header: { name: 'Your Echo', title: `Take back one boon your ${CLASSES[echo.cls].name} carried`, css: '#7FB2D9' },
+    items,
+    toCard: (b) => boonCard(p, b),
+    onPick: (b) => {
+      takeBoon(p, { ...b });
+      run.boons.push(b.id);
+      ui.setSlots(slotIcons(p));
+      ui.showBanner(BOONS[b.id].name.toUpperCase(), 'Reclaimed from your Echo.', 1500);
+      world.room.openDoors();
+    },
+  });
+}
+
 function clearRoom() {
   const room = world.room, kind = room.plan.kind;
   room.cleared = true;
@@ -404,12 +447,13 @@ function clearRoom() {
   dungeonFeats(true);
   if (kind === 'chest') earn('ambush');
   world.slowmo = 0.8; // the last kill lands in slow motion
-  ui.showBanner(kind === 'boss' ? TYPES[room.plan.waves[0][0]].name.toUpperCase() + ' FALLS' : 'CLEARED', '', 1400);
+  if (!room.plan.echo) ui.showBanner(kind === 'boss' ? TYPES[room.plan.waves[0][0]].name.toUpperCase() + ' FALLS' : 'CLEARED', '', 1400);
   rumble(0.3, 0.3, 120);
   // shards come home when the fight ends, like Hades' bloodstones
   for (const k of room.pickups.filter((k) => k.type === 'shard')) disposeObject(k.obj);
   room.pickups = room.pickups.filter((k) => k.type !== 'shard');
   world.player.ammo = world.player.maxAmmo;
+  if (room.plan.echo) { room.addPickup('echo', room.center.x - 1.2, room.center.z + 1.2); ui.showBanner('AT REST', 'Your Echo leaves something behind.', 1600); }
   if (kind === 'trial') return trialReward(room);
   if (kind === 'chest') room.addPickup('bigash', room.center.x + 1.2, room.center.z - 1.2); // the ambush paid off
   const reward = kind === 'boss' ? 'bigash' : room.plan.reward;
@@ -448,6 +492,7 @@ function collect(k) {
     floatText(p.pos, `+${n} ash`, 'ash');
   } else if (type === 'boon') return openBoon(k.patron ?? Object.keys(PATRONS)[Math.floor(Math.random() * Object.keys(PATRONS).length)], !!k.epic);
   else if (type === 'pom') return openKeystone();
+  else if (type === 'echo') return openEcho();
   world.room.openDoors();
 }
 

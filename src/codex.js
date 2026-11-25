@@ -85,7 +85,8 @@ const SECTIONS = [
   () => entry('The Anvil', `<p>Spend ash between runs, at the Anvil in the Keep. These last forever.</p><ul>${UPGRADES.map((u) => `<li><b>${u.name}</b>: ${u.desc} (up to ${u.max})</li>`).join('')}</ul>`)
     + entry('Level-up perks', `<p>Kills give XP. Each level lets you pick one of three perks once the room is clear.</p><ul>${PERKS.map((k) => `<li><b>${k.name}</b>: ${k.desc}</li>`).join('')}</ul>`)
     + HARDCORE()
-    + entry('Daily Run', '<p>On the Play menu. One dungeon a day, the same for everyone: the day picks the class, the vow and the seed, everyone gets the first weapon, and the Anvil stays switched off. Your score is depth times 100, plus kills, plus 500 for escaping through a Lock; your best one each day goes on the shared board.</p>'),
+    + entry('Daily Run', '<p>On the Play menu. One dungeon a day, the same for everyone: the day picks the class, the vow and the seed, everyone gets the first weapon, and the Anvil stays switched off. Your score is depth times 100, plus kills, plus 500 for escaping through a Lock; your best one each day goes on the shared board.</p>')
+    + entry('Echoes', '<p>When a solo run ends in death and you carried boons, that hero becomes an Echo at the depth where they fell (depth 2 or deeper). On your next Dungeon run, the first fight at or below that depth is a duel with it instead: your old class and weapon, pale and see-through, fighting the way that class fights and hitting harder for every boon it carried. Beat it and it leaves an orb: take back one of its boons, at the rarity you had it. Die again first, and your newest hero takes its place. Echoes stay out of co-op and the Daily Run.</p>'),
 
   () => feats(true),
 

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { C } from './config.js';
 import { world } from './world.js';
-import { makeGrunt, makeHexer, makeBrute, makeStalker, makeSapper, makeWhirler, makeSlinger, makeShieldbearer, makeBonecaller, makeWarden, makePrior, makeReaver, makeDrowned, makeTidecaller, makeLurker, makeDrownedKing, makeCinderling, makeSmelter, makeAnvilback, makeForgemaster, disposeObject } from './models.js';
+import { makeKnight, makeGrunt, makeHexer, makeBrute, makeStalker, makeSapper, makeWhirler, makeSlinger, makeShieldbearer, makeBonecaller, makeWarden, makePrior, makeReaver, makeDrowned, makeTidecaller, makeLurker, makeDrownedKing, makeCinderling, makeSmelter, makeAnvilback, makeForgemaster, disposeObject } from './models.js';
 import { earn } from './feats.js';
 import { XP_FOR, xpToNext } from './run.js';
 import { updateStatus } from './boons.js';
@@ -9,6 +9,7 @@ import { hooks, makeEntity, meleeArc, fireProjectile, aoe, telegraph, addTrail, 
 import { sfx } from './audio.js';
 import { settings } from './settings.js';
 
+export const GHOST = 0x7fb2d9; // the Echo's colour
 const Y = new THREE.Vector3(0, 1, 0), tmp = new THREE.Vector3(), dir = new THREE.Vector3();
 
 export const TYPES = {
@@ -35,6 +36,8 @@ export const TYPES = {
   smelter: { name: 'Smelter', about: 'Lobs molten iron where you stand. It splashes once, then the pool burns again a moment later: get out and stay out.', model: makeSmelter, hp: 32, speed: 2.5, radius: 0.3, ash: 4, think: smelterAI },
   anvilback: { name: 'Anvilback', about: 'Slow and heavily armoured. Slams the ground twice, the second time wider. Corrode and Doom cut through armour best.', model: makeAnvilback, hp: 90, speed: 1.9, radius: 0.45, armor: 0.3, ash: 6, knockResist: 0.3, think: anvilAI },
   forgemaster: { name: 'The Forgemaster', title: 'Lord of the Ember Forges', boss: true, about: 'Hammers the floor and sends rings of sparks out of it, rains molten iron around you, and charges. Calls cinderlings when hurt.', model: makeForgemaster, hp: 520, speed: 2.3, radius: 0.9, armor: 0.15, ash: 50, knockResist: 0.1, stunResist: 0.25, think: forgeAI },
+  // your last fallen hero, waiting where they fell. main.js dresses it (model, name, style, power) before it rises.
+  echo: { name: 'Echo', title: 'of your last hero', boss: true, ghost: true, about: 'Your last fallen hero, with their weapon, waiting at the depth where they fell.', model: makeKnight, hp: 150, speed: 3.3, radius: 0.4, armor: 0.05, ash: 25, knockResist: 0.3, stunResist: 0.4, style: 'melee', power: 0, think: echoAI },
   // the tutorial's training target: never moves, never attacks, never dies
   dummy: { name: 'Dummy', model: makeGrunt, hp: 99999, speed: 0, radius: 0.33, ash: 0, knockResist: 0, think: () => {} },
 };
@@ -48,7 +51,7 @@ export const AFFIXES = {
 };
 
 // What the codex shows about each enemy
-export const BESTIARY = Object.entries(TYPES).filter(([k]) => k !== 'dummy').map(([id, t]) => ({ id, name: t.name, title: t.title, boss: !!t.boss, about: t.about, hp: t.hp }));
+export const BESTIARY = Object.entries(TYPES).filter(([k]) => k !== 'dummy' && k !== 'echo').map(([id, t]) => ({ id, name: t.name, title: t.title, boss: !!t.boss, about: t.about, hp: t.hp }));
 
 // Enemies always get a crimson warning circle before they appear, so nothing spawns on top of you unseen
 export function spawnEnemy(type, x, z, depth, elite = false) {
@@ -81,6 +84,8 @@ function create(type, x, z, depth, elite = false, affix = null) {
     if (e.affix === 'ironclad') { e.armor = Math.min(0.6, e.armor + 0.2); e.knockResist *= 0.4; }
     floatText(e.pos, AFFIXES[e.affix].name.toUpperCase(), 'status');
   }
+  // an Echo is pale and see-through, so you know it isn't you
+  if (T.ghost) for (const m of e.model.mats) { m.color.lerp(new THREE.Color(GHOST), 0.55); m.transparent = true; m.opacity = 0.78; }
   // skeletons claw their way up out of the floor before they act
   e.model.anim.once('spawn', 0.9);
   if (!e.model.anim.has('spawn') && T.rise) e.riseT = 0.9; // the dead claw their way up; people just arrive
@@ -505,6 +510,43 @@ function lunge(e, k) {
   }, e.chain > 0 ? 0 : 1.3 * k);
 }
 
+
+// Your Echo fights the way its class did. Fighters dash in from range and swing twice; casters keep away, fire fans
+// of bolts and dash off when you close in. Below half health it is quicker. Its hits grow with the boons it carries.
+function echoAI(e, p, dt) {
+  if (e.state === 'charging') return chargeStep(e, p, dt);
+  if (e.state === 'windup') return;
+  const k = e.hp < e.maxHp / 2 ? 0.7 : 1, hit = 10 + e.depth + e.T.power;
+  e.timer -= dt;
+  const d = face(e, p);
+  if (e.T.style === 'caster') {
+    if (e.timer > 0) return walk(e, d < 4 ? -1 : d > 8 ? 1 : 0);
+    if (d < 2.6) { // too close: dash away (no damage) and line up again
+      Object.assign(e, { state: 'charging', chargeT: 0.3, chargeHit: true, chargeDir: e.facing.clone().negate(), chargeSpeed: 16 });
+      e.timer = 0.3;
+      return;
+    }
+    return windup(e, { shape: 'arc', radius: 9, arc: 0.9, duration: 0.65 * k }, () => {
+      for (const a of [-0.3, -0.15, 0, 0.15, 0.3]) fireProjectile({ owner: e, dir: e.facing.clone().applyAxisAngle(Y, a), speed: 10, damage: hit * 0.7, range: 11, size: 0.2, color: GHOST });
+    }, 1.3 * k);
+  }
+  if (e.timer > 0) return e.combo > 0 ? undefined : walk(e, d > 1.8 ? 0.6 : 0);
+  if (e.combo > 0) return echoSwing(e, hit, k);
+  if (d > 4.5 && e.phase++ % 2 === 0) {
+    const line = e.facing.clone();
+    return windup(e, { shape: 'line', length: 5, width: 0.8, duration: 0.5 * k }, () => {
+      Object.assign(e, { state: 'charging', chargeT: 5 / 17, chargeHit: false, chargeDir: line, chargeSpeed: 17, chargeDmg: hit });
+    }, 0.4);
+  }
+  if (d > 1.7) return walk(e);
+  e.combo = 2;
+  echoSwing(e, hit, k);
+}
+function echoSwing(e, hit, k) {
+  e.combo--;
+  windup(e, { shape: 'arc', radius: 2.0, arc: 2.0, duration: 0.45 * k },
+    () => meleeArc(e, { range: 2.0, arc: 2.0, damage: hit, knockback: 5 }), e.combo > 0 ? 0.1 : 0.9 * k);
+}
 
 // A grunt that hits harder and slows you when it connects
 function drownedAI(e, p, dt) {

@@ -23,6 +23,7 @@ export const FEATS = [
   { id: 'shrine', name: 'A Fair Price', desc: 'Strike a bargain at a Shrine.', ash: 30 },
   { id: 'trial', name: 'Proven', desc: 'Pass a Trial.', ash: 40 },
   { id: 'ambush', name: 'Not a Chest', desc: 'Survive a chest ambush.', ash: 40 },
+  { id: 'echo', name: 'Laid to Rest', desc: 'Defeat the Echo of a hero you lost.', ash: 60 },
   { id: 'vowed', name: 'Sworn', desc: 'Reach depth 10 with three or more vows sworn.', ash: 150 },
   { id: 'army', name: 'Army of One', desc: 'Have four raised dead fighting for you at once.', ash: 60 },
 ];

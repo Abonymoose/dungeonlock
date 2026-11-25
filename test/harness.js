@@ -755,3 +755,42 @@ export async function rooms() {
   check(results, 'the furnace dead fight there, and the Forgemaster waits at 29', foes.some((t) => ['cinderling', 'smelter', 'anvilback'].includes(t)) && !foes.includes('grunt') && R.makePlan(29, 'boss').waves[0][0] === 'forgemaster');
   return results;
 }
+
+// Echoes: a dead hero waits at their depth; the next run duels it there, and beating it gives one of its boons back
+export async function echoes() {
+  const results = [];
+  const { BOONS } = await import('../src/boons.js');
+  const { WEAPONS } = await import('../src/classes.js');
+  const boon = Object.keys(BOONS).find((id) => BOONS[id].patron === 'cinder' && !BOONS[id].slot);
+  meta.echo = { cls: 'wizard', weapon: WEAPONS.wizard[0].id, depth: 1, boons: [{ id: boon, rarity: 'epic', level: 2 }] };
+  await toTitle();
+  press(0);
+  await waitFor('play');
+  W.player.maxHp = W.player.hp = 99999;
+  W.run.xp = -1e9; // no level-up menu in the way
+  await goDoor(W.room.doors[0]);
+  check(results, 'the first fight at its depth is a duel with your Echo', !!W.room.plan.echo && W.room.plan.waves.length === 1, W.room.plan.kind);
+  step(2.5); // the wave waits 0.9s, then its warning circle 0.8s
+  const e = W.enemies.find((x) => x.type === 'echo' && !x.dead);
+  check(results, 'the Echo wears your old class, pale and see-through', !!e && e.T.style === 'caster' && e.model.mats.every((m) => m.transparent), e?.T.name);
+  check(results, 'its name is on the boss bar', document.querySelector('#boss .name')?.textContent === 'ECHO OF YOUR WIZARD', document.querySelector('#boss .name')?.textContent);
+  let acted = false;
+  for (let t = 0; t < 6 && e; t += 0.1) { step(0.1); acted ||= e.state !== 'recover'; }
+  check(results, 'it fights back', acted);
+  if (e) damage(e, 1e6, e.pos);
+  for (let i = 0; i < 10 && !W.room.cleared; i++) step(0.5);
+  const orb = W.room.pickups.find((k) => k.type === 'echo');
+  check(results, 'beaten, it leaves an orb', !!orb);
+  if (orb) { W.player.pos.set(orb.obj.position.x, 0, orb.obj.position.z); step(0.6); }
+  check(results, 'the orb offers its boons back', W.state === 'choice' && /YOUR ECHO/.test(document.querySelector('#screen').textContent));
+  press(0); step(0.1);
+  const got = W.player.boons.find((b) => b.id === boon);
+  check(results, 'you take one back at its rarity, and the Echo is gone', got?.rarity === 'epic' && !meta.echo && !!meta.feats?.echo, JSON.stringify(got));
+  W.run.depth = 4;
+  W.player.lives = 0; W.player.hp = 0; W.player.dead = true;
+  step(3);
+  check(results, 'dying with boons leaves a new Echo where you fell', W.state === 'over' && meta.echo?.depth === 4 && meta.echo.boons.some((b) => b.id === boon), JSON.stringify(meta.echo));
+  press(0);
+  meta.echo = null;
+  return results;
+}
