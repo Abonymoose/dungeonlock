@@ -22,7 +22,7 @@ New players can start with the **Tutorial** card on the Play menu. It teaches th
 | Move | Keyboard and mouse | Controller | Phone |
 |---|---|---|---|
 | Move | WASD or arrows | Left stick | Drag on the left half |
-| Aim | Mouse | Right stick | Turns to the nearest foe |
+| Aim | Mouse, while it moves (rest it to face the way you walk) | Right stick | Turns to the nearest foe |
 | Attack | Left click or J | X | ATTACK |
 | Special | Right click or K | Y | SPECIAL |
 | Cast | Q or L | B | CAST |

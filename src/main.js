@@ -698,9 +698,10 @@ const WIKI_URL = 'https://dungeonwiki.pages.dev';
 const ACTION_NAME = { attack: 'Attack', special: 'Special', cast: 'Cast', dash: 'Dash', interact: 'Use', pause: 'Pause' };
 
 // which menu index each screen moves, so the mouse can drive it too
-const SEL_KEY = { lobby: 'lobby', home: 'home', playmenu: 'play', title: 'cls', anvil: 'anvil', choice: 'boon', pause: 'pause', settings: 'set', over: 'over' };
+const SEL_KEY = { device: 'device', lobby: 'lobby', home: 'home', playmenu: 'play', title: 'cls', anvil: 'anvil', choice: 'boon', pause: 'pause', settings: 'set', over: 'over' };
 const RENDER = {
   home: () => ui.homeScreen(menu.home, meta),
+  device: () => ui.deviceScreen(menu.device),
   lobby: () => ui.lobbyScreen(menu.lobby ?? 0, lobbyView()),
   playmenu: () => { if (board === null) { board = []; loadBoard(); } return ui.playScreen(menu.play, meta, dailyInfo()); },
   title: () => ui.titleScreen(CLASS_IDS.map((id, i) => {
@@ -844,6 +845,10 @@ function activate(r) {
 // ---- tutorial ----
 
 async function beginTutorial() {
+  const device = ui.DEVICES[menu.device].id;
+  settings.keysOnly = device === 'keys'; // prompts show J, not the left mouse button
+  saveSettings();
+  input.usingPad = device === 'pad'; input.touch = device === 'touch'; // prompts start on that device
   world.run = { depth: 0, keys: 0, ash: 0, kills: 0, boons: [], keyDoorsSeen: 0, xp: 0, level: 1, pendingLevels: 0, rerolls: 0 };
   ui.hideScreen();
   newPlayer();
@@ -851,7 +856,7 @@ async function beginTutorial() {
   const plan = makePlan(0, 'tutorial');
   plan.doorPlans = [{ kind: 'home', reward: null }];
   await enterRoom(plan);
-  startTutorial();
+  startTutorial(device);
 }
 
 function leaveTutorial(done) {
@@ -876,11 +881,17 @@ const STATES = {
     if (pressed('back')) return show('home');
     if (!confirmed()) return;
     const card = ui.PLAY_CARDS[menu.play];
-    if (card === 'tutorial') return beginTutorial();
+    if (card === 'tutorial') { menu.device = input.touch ? 3 : input.usingPad ? 2 : settings.keysOnly ? 1 : 0; return show('device'); }
     if (card === 'daily') return startDaily();
     if (card === 'coop') return enterLobby();
     menu.mode = 'dungeon';
     return enterKeep();
+  },
+
+  device() {
+    if (navigate('device', ui.DEVICES.length)) return RENDER.device();
+    if (pressed('back')) return show('playmenu');
+    if (confirmed()) { sfx('menu'); beginTutorial(); }
   },
 
   title(dt) {

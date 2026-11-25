@@ -1,5 +1,5 @@
 import { world } from './world.js';
-import { btn, input } from './input.js';
+import { btn } from './input.js';
 import { spawnEnemy } from './enemies.js';
 import { sfx } from './audio.js';
 
@@ -7,10 +7,20 @@ import { sfx } from './audio.js';
 const dummy = () => world.enemies.find((e) => e.type === 'dummy' && !e.dead);
 const fightOver = () => world.pendingSpawns === 0 && !world.enemies.some((e) => !e.dead && e.type !== 'dummy');
 
+// what the first steps say for each way of playing (picked on the screen before the tutorial)
+const MOVE = {
+  kbm: 'Walk around the room with WASD. Move the mouse to aim; leave it still and you face the way you walk.',
+  keys: 'Walk around the room with WASD or the arrow keys. You face the way you walk.',
+  pad: 'Walk around the room with the left stick. The right stick aims.',
+  touch: 'Walk around the room: drag your thumb on the left side of the screen.',
+};
+const AIM = { kbm: 'Point the mouse at the training dummy', keys: 'Walk toward the training dummy to face it', pad: 'Aim at the training dummy with the right stick', touch: 'Walk up to the training dummy, you turn to face it on your own' };
+const device = () => world.tutorial?.device ?? 'kbm';
+
 export const STEPS = [
-  { text: () => (input.touch ? 'Walk around the room: drag your thumb on the left side of the screen.' : 'Walk around the room with the left stick or WASD.'), goal: 6, count: (t) => t.moved },
+  { text: () => MOVE[device()], goal: 6, count: (t) => t.moved },
   { text: () => `Dash with ${btn('dash')}. You can't be hit while dashing.`, goal: 2, count: (t) => t.dashes },
-  { text: () => `Hold ${btn('attack')} to attack the training dummy. Every third hit is a heavy finisher.`, goal: 3, count: (t) => t.hits.attack ?? 0 },
+  { text: () => `${AIM[device()]} and hold ${btn('attack')} to attack. Every third hit is a heavy finisher.`, goal: 3, count: (t) => t.hits.attack ?? 0 },
   { text: () => `Use your special on the dummy with ${btn('special')}.`, goal: 1, count: (t) => t.hits.special ?? 0 },
   { text: () => `Throw a Lock Shard with ${btn('cast')}, then walk over it to pick it back up.`, goal: 1, count: (t, p) => (t.thrown && p.ammo === p.maxAmmo ? 1 : 0) },
   {
@@ -27,8 +37,8 @@ export const STEPS = [
   { text: () => 'Walk through the open door to finish.', start: () => world.room.openDoors(), goal: 1, count: () => 0 },
 ];
 
-export function startTutorial() {
-  world.tutorial = { step: 0, moved: 0, dashes: 0, hits: {}, thrown: false };
+export function startTutorial(device = 'kbm') {
+  world.tutorial = { device, step: 0, moved: 0, dashes: 0, hits: {}, thrown: false };
   world.player.lives = 99; // you can't lose the tutorial
   const c = world.room.center;
   spawnEnemy('dummy', c.x - 2, c.z - 1, 0);

@@ -134,6 +134,7 @@ export async function all() {
   T.step(2);
   await T.toPlayMenu();
   T.clickSel(3); // Tutorial
+  T.clickSel(2); // on a controller
   await T.waitFor('play');
   for (let i = 0; i < 50 && !W.tutorial; i++) await T.sleep(100);
   T.step(1.2);

@@ -26,8 +26,10 @@ addEventListener('keyup', (e) => keys.delete(e.code));
 addEventListener('blur', () => keys.clear());
 addEventListener('mousemove', (e) => {
   if (fromTouch()) return;
-  input.mouse = { x: e.clientX, y: e.clientY }; input.mouseAim = true; input.usingPad = false; input.touch = false;
+  input.mouse = { x: e.clientX, y: e.clientY }; input.mouseAt = performance.now(); input.mouseAim = true; input.usingPad = false; input.touch = false;
 });
+// the mouse turns you only while it is in use: moved in the last second, or a mouse button held. A resting cursor lets you face the way you walk.
+export const mouseAiming = () => input.mouseAim && !!input.mouse && (performance.now() - (input.mouseAt ?? -1e9) < 1000 || [...keys].some((k) => k.startsWith('Mouse')));
 addEventListener('mousedown', (e) => {
   if (fromTouch()) return;
   if (captured({ kind: 'key', code: 'Mouse' + e.button })) return; // rebinding takes any click, even on a menu
@@ -113,7 +115,9 @@ export const pressed = (action) => !!held[action] && !prev[action];
 export const isHeld = (action) => !!held[action];
 // on touch, prompts name the on-screen button
 const TOUCH = { attack: 'ATTACK', special: 'SPECIAL', cast: 'CAST', dash: 'DASH', interact: 'USE', craft: 'CRAFT', pause: 'PAUSE', confirm: 'TAP', back: 'BACK', alt: 'MORE', left: '<', right: '>', up: '^', down: 'v' };
-export const label = (action) => (input.touch ? TOUCH[action] : input.usingPad ? padName(binding(action).pad[0]) : keyName(binding(action).keys[0]));
+// keyboard-only players (picked in the tutorial) are shown a key, never a mouse button
+const keyOf = (action) => { const k = binding(action).keys; return (settings.keysOnly && k.find((c) => !c.startsWith('Mouse'))) || k[0]; };
+export const label = (action) => (input.touch ? TOUCH[action] : input.usingPad ? padName(binding(action).pad[0]) : keyName(keyOf(action)));
 // data-act makes a hint tappable (touch.js turns the tap into a press)
 export const btn = (action) => `<span class="btn" data-act="${action}">${label(action)}</span>`;
 

@@ -153,6 +153,24 @@ export function playScreen(sel, meta, daily) {
     <div class="hints"><span>${btn('confirm')}Enter</span><span>${btn('back')}Back</span></div>`, 'play');
 }
 
+// Before the tutorial: how are you playing? The tutorial teaches that device's controls.
+export const DEVICES = [
+  { id: 'kbm', name: 'Keyboard and mouse', desc: 'WASD to move. The mouse aims while it moves.' },
+  { id: 'keys', name: 'Keyboard only', desc: 'WASD or the arrow keys to move. You face the way you walk.' },
+  { id: 'pad', name: 'Controller', desc: 'Left stick to move, right stick to aim.' },
+  { id: 'touch', name: 'Phone or tablet', desc: 'Drag your thumb to move, tap the buttons. Attacks turn you toward the closest foe.' },
+];
+export function deviceScreen(sel) {
+  const items = DEVICES.map((d, i) => `<div class="home-item ${i === sel ? 'sel' : ''}" data-sel="${i}">${KEYHOLE}<span>${d.name}</span></div>`).join('');
+  showScreen(`
+    <div class="home">
+      <h2>How are you playing?</h2>
+      <nav class="home-menu">${items}</nav>
+      <p class="home-desc">${DEVICES[sel].desc}</p>
+    </div>
+    <div class="hints"><span>${btn('confirm')}Start the tutorial</span><span>${btn('back')}Back</span></div>`, 'device');
+}
+
 // classes: each with the weapon it shows ({ ...class, weapon, owned, count, at }); up and down look through weapons
 export function titleScreen(classes, sel, meta, cast) {
   const cards = classes.map((c, i) => {

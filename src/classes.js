@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { C } from './config.js';
 import { world } from './world.js';
-import { input, pressed, isHeld, rumble } from './input.js';
+import { input, pressed, isHeld, rumble, mouseAiming } from './input.js';
 import { GROUND_RIGHT, GROUND_UP, basic, flashLight, screenToGround } from './render.js';
 import { makeKnight, makeRogue, makeWizard, makeBarbarian, makeNecromancer } from './models.js';
 import { summonAlly } from './enemies.js';
@@ -357,8 +357,8 @@ export function updatePlayer(p, dt) {
   const busy = p.dashT > 0 || p.charge;
   if (!busy) {
     if (input.aim) p.facing.set(0, 0, 0).addScaledVector(GROUND_RIGHT, input.aim.x).addScaledVector(GROUND_UP, -input.aim.y).normalize();
-    else if (input.mouseAim && input.mouse) {
-      // keyboard and mouse: always face the cursor, twin-stick style
+    else if (mouseAiming()) {
+      // keyboard and mouse: face the cursor while the mouse is in use, twin-stick style
       const g = screenToGround(input.mouse.x, input.mouse.y).sub(p.pos).setY(0);
       if (g.lengthSq() > 0.04) p.facing.copy(g.normalize());
     } else if (input.touch && (foe = nearestFoe(p))) p.facing.copy(foe.pos).sub(p.pos).setY(0).normalize();

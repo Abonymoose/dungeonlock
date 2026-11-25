@@ -8,7 +8,7 @@ import { torchLights, GROUND_RIGHT } from '../src/render.js';
 import { audio } from '../src/audio.js';
 import { settings, resetControls } from '../src/settings.js';
 import * as THREE from 'three';
-import { input } from '../src/input.js';
+import { input, label } from '../src/input.js';
 import { spawnEnemy, TYPES } from '../src/enemies.js';
 import { damage } from '../src/combat.js';
 
@@ -147,11 +147,15 @@ export async function smoke() {
       // it may land at your feet and be picked straight back up; the bug is a shard lost in the void
       check(results, 'missed Cast lands on the floor', W.player.ammo === W.player.maxAmmo || (!!shard && W.room.onFloor(shard.obj.position)));
       // the mouse cursor to the right of the player turns them to face it
-      Object.assign(input, { mouseAim: true, mouse: { x: innerWidth * 0.8, y: innerHeight * 0.5 } });
+      Object.assign(input, { mouseAim: true, mouseAt: performance.now(), mouse: { x: innerWidth * 0.8, y: innerHeight * 0.5 } });
       step(0.1);
       const right = W.player.facing.x - W.player.facing.z; // screen-right on the ground is (+x, -z)
-      input.mouseAim = false;
       check(results, 'mouse aim faces the cursor', right > 1);
+      // a cursor left resting doesn't hold your aim: walking left turns you left
+      input.mouseAt = performance.now() - 2000;
+      pad.axes[0] = -1; step(0.2); pad.axes[0] = 0;
+      input.mouseAim = false;
+      check(results, 'a resting mouse lets you face the way you walk', W.player.facing.x - W.player.facing.z < -1);
     }
     W.player.maxHp = W.player.hp = 9999;
     await goDoor(W.room.doors[0]);
@@ -244,6 +248,12 @@ export async function tutorial() {
   const results = [], t = () => W.tutorial;
   await toPlayMenu();
   clickSel(3); // Tutorial
+  check(results, 'tutorial asks how you play', W.state === 'device' && document.querySelectorAll('#screen [data-sel]').length === 4);
+  const was = settings.keysOnly;
+  settings.keysOnly = true; input.usingPad = input.touch = false;
+  check(results, 'keyboard only shows keys, not mouse buttons', label('attack') === 'J' && label('special') === 'K', label('attack'));
+  settings.keysOnly = was;
+  clickSel(2); // controller
   await waitFor('play');
   for (let i = 0; i < 50 && !W.tutorial; i++) await sleep(100); // it starts once the fade-in finishes
   check(results, 'tutorial starts', !!W.tutorial, W.room?.plan.kind);
